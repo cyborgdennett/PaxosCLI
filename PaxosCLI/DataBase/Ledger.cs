@@ -11,6 +11,7 @@ public class Ledger : DbContext
 {
     public DbSet<LedgerEntry> Entries { get; set; } //All of the entries, written due to balloting.
     public DbSet<PaxosProgress> Progress { get; set; } //The progress required to be kept track of by the priest. Contains only one record
+    public DbSet<NetworkNodeIps> NodeAdresses { get; set; } //Stores the ips.
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -63,5 +64,15 @@ public class PaxosProgress
     public decimal NextBal { get; set; }
     public decimal PrevBal { get; set; }
     public byte[] PrevDec { get; set; }
+}
+
+/// <summary>
+/// Contains the Ip address of the nodes.
+/// </summary>
+public class NetworkNodeIps
+{
+    public int Id { get; set; }
+    public string Ip { get; set; }
+    public int Port { get; set; }
 }
 

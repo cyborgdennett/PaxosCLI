@@ -90,6 +90,7 @@ public class Server
                 _parentNode.Proposer.ReceiveLastVoteMessage(lastVote);
                 break;
             case "SuccessBeginBallot":
+                //TODO: not finished!!!
                 SuccessBeginBallot successBeginBallotMsg = (SuccessBeginBallot)receivedMessage;
                 await _parentNode.Learner.ReceiveSuccess((Success)successBeginBallotMsg.successMsg);
                 await _parentNode.Acceptor.OnReceiveBeginBallot((BeginBallot)successBeginBallotMsg.beginBallotMsg);
@@ -114,6 +115,12 @@ public class Server
                 DecreeProposal decreeProposal = (DecreeProposal)receivedMessage;
                 Console.WriteLine("Received a new decree proposal for [{0}]", MessageHelper.ByteArrayToString(decreeProposal._decree));
                 _parentNode.Proposer.OnDecreeProposal(decreeProposal);
+                break;
+            case "TransactionProposal":
+                TransactionProposal transactionProposal = (TransactionProposal)receivedMessage;
+                Console.WriteLine("Received a new transaction proposal for [{0}] to network [{1}]", 
+                    MessageHelper.ByteArrayToString(transactionProposal._decree),transactionProposal._network_node);
+                _parentNode.Proposer.OnTransactionProposal(transactionProposal);
                 break;
             case "RequestMissingEntriesMessage":
                 RequestMissingEntriesMessage missingEntriesMessage = (RequestMissingEntriesMessage)receivedMessage;

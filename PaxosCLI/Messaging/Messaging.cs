@@ -117,6 +117,12 @@ public static class MessageHelper
                         byte[] decree = StringToByteArray(messageContent[0]);
                         return new DecreeProposal(messageId, senderId, decree);
                     }
+                case "TP":
+                    {
+                        byte[] decree = StringToByteArray(messageContent[0]);
+                        string network_node = messageInformation[2];
+                        return new TransactionProposal(messageId, senderId, network_node, decree);
+                    }
                 case "RME":
                     {
                         long decreeId = long.Parse(messageContent[0]);
@@ -489,5 +495,30 @@ public class InformMissingEntriesMessage: Message
         return MessageHelper.StringToByteArray(String.Format("{0},IME;{1}",
                                                                 _id.ToString(CultureInfo.InvariantCulture),
                                                                 _entriesString));
+    }
+}
+/// <summary>
+/// DecreeProposal + network_node
+/// </summary>
+public class TransactionProposal: Message
+{
+    public string _network_node;
+    public byte[] _decree { get; private set; }
+
+    public TransactionProposal(long messageIdCounter, int senderId, string network_node, byte[] decree)
+    {
+        _doResend = true;
+        _id = MessageHelper.CreateUniqueMessageId(messageIdCounter, senderId);
+        _senderId = senderId;
+        _network_node = network_node;
+        _decree = decree;
+    }
+
+    public override byte[] ToByteArray()
+    {
+        return MessageHelper.StringToByteArray(String.Format("{0},TP,{1};{2}",
+                                                                _id.ToString(CultureInfo.InvariantCulture),
+                                                                _network_node,
+                                                                MessageHelper.ByteArrayToString(_decree)));
     }
 }

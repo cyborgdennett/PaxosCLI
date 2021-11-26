@@ -20,6 +20,7 @@ public class Proposer
     public static readonly string OLIVE_DAY_DECREE = "The ides of February is national olive day";
     public bool presidentInitTaskFinished;
     private Queue<byte[]> Proposals;
+    private Queue<Tuple<string, byte[]>> TransactionProposals;
     private int totalQueeSize = 5;
     private Thread ExecutePaxosOnReceivedProposalThread;
 
@@ -27,6 +28,7 @@ public class Proposer
     {
         _parentNode = node;
         Proposals = new Queue<byte[]>();
+        Proposals = new Queue<string, byte[]>();
     }
 
     /// <summary>
@@ -45,6 +47,7 @@ public class Proposer
         }
 
             
+        //TODO: create system that can use different inputs
         while (_parentNode.Client.IsSending && _parentNode.Server.isListening)
         {
             Thread.Sleep(1000);
@@ -187,61 +190,6 @@ public class Proposer
         }
         return 2;
     }
-
-    /// <summary>
-    /// TODO: Send succesNextBallot message when possible.
-    ///     Current state: it is a copt of sendNextBallot...
-    /// </summary>
-    /// <returns></returns>
-    public async Task<int> SendSuccessNextBallotMessage()
-    {
-        TimeAtPreviousAction = DateTime.Now;
-        Cluster setOfNodes = GetOnlineNodes();
-        bool majorityOnline = setOfNodes.HasMajorityOf(_parentNode.AllNodes);
-
-        if (_parentNode.status == NodeStatus.trying
-            && _parentNode.isPresident
-            && majorityOnline)
-        {
-            Console.WriteLine("[Proposer] Sending nextBallotMsg to {0},", String.Join(",", setOfNodes.Keys));
-            TimeAtPreviousAction = DateTime.Now;
-            long lastEntryUntilMissing = await LedgerHelper.GetLastEntryIdUntilMissingData();
-            NextBallot nextBallot = new NextBallot(_parentNode.Client._messageIdCounter, _parentNode.Id, _parentNode.lastTried, lastEntryUntilMissing);
-
-            //send message to peers
-            await _parentNode.Client.SendMessageToCluster(nextBallot, setOfNodes.GetClusterExcludingNode(_parentNode), true);
-
-
-            //send this message to own acceptor
-            await _parentNode.Acceptor.OnReceiveNextBallot(nextBallot);
-
-            //wait for reply from set of nodes
-            while (_parentNode.prevVotes.Count() != setOfNodes.Count())
-            {
-                if ((DateTime.Now - TimeAtPreviousAction).TotalMilliseconds >= Node.MINUTE_IN_PAXOS_TIME * 22)
-                {
-                    Console.WriteLine("[Proposer] Didn't get enough lastvote messages in time.");
-                    return 1;
-                }
-            }
-            Console.WriteLine("[Proposer] Received all lastvotes from chosen set of nodes.");
-            return 0;
-        }
-        else if (!majorityOnline)
-        {
-            return 1;
-        }
-        else if (!_parentNode.isPresident)
-        {
-            Console.WriteLine("[Proposer] Cannot send a NextBallot message as a non-president.");
-        }
-        else if (_parentNode.status != NodeStatus.trying)
-        {
-            Console.WriteLine("[Proposer] Cannot send a NextBallot message when not trying.");
-        }
-        return 2;
-    }
-
 
 
     public void ReceiveLastVoteMessage(LastVote lastVote)
@@ -424,6 +372,38 @@ public class Proposer
         return 1;
     }
 
+    /// <summary>
+    /// Send a success and beginballot msg in one.
+    /// !!!DOES NOT WORK!!!
+    /// </summary>
+    /// <returns></returns>
+    private async Task<int> SendSuccessBeginBallotMessage()
+    {
+        if (_parentNode.status == NodeStatus.polling && _parentNode.isPresident)
+        {
+            TimeAtPreviousAction = DateTime.Now;
+            SuccessBeginBallot successBeginBallotMsg = new SuccessBeginBallot(_parentNode.Client._messageIdCounter, _parentNode.Id, _parentNode.lastTried, _parentNode.decree);
+            await _parentNode.Client.SendMessageToCluster(beginBallotMsg, _parentNode.quorum.GetClusterExcludingNode(_parentNode), true);
+
+            //send this message to own acceptor
+            await _parentNode.Acceptor.OnReceiveBeginBallot(beginBallotMsg);
+
+            while (_parentNode.voters.Count() < _parentNode.quorum.Count())
+            {
+                //wait for every quorum member to reply
+                if ((DateTime.Now - TimeAtPreviousAction).TotalMilliseconds >= Node.MINUTE_IN_PAXOS_TIME * 22)
+                {
+                    return 1;
+                }
+            }
+            return 0;
+        }
+        else
+        {
+            Console.WriteLine("[Proposer] Cannot send beginballot message, because not polling.");
+        }
+        return 1;
+    }
 
     private async Task<int> SendBeginBallotMessage()
     {
@@ -604,6 +584,13 @@ public class Proposer
                 {
                     while (presidentInitTaskFinished)
                     {
+                        if (TransactionProposals.Count() > 0
+                            && _parentNode.status == NodeStatus.idle
+                            && GetOnlineNodes().HasMajorityOf(_parentNode.AllNodes))
+                        {
+                            byte[] toBallot = Proposals.Dequeue();
+                            await ExecutePaxos(toBallot, false, true, 0);
+                        }
                         if (Proposals.Count() > 0
                             && _parentNode.status == NodeStatus.idle
                             && GetOnlineNodes().HasMajorityOf(_parentNode.AllNodes))
@@ -685,6 +672,15 @@ public class Proposer
     public void OnDecreeProposal(DecreeProposal decreeProposal)
     {
         Proposals.Enqueue(decreeProposal._decree);
+    }
+
+    /// <summary>
+    /// TODO: make sure that after it is in the own network, it will be send to the other network
+    /// </summary>
+    /// <param name="decreeProposal"></param>
+    public void OnTransactionProposal(TransactionProposal transactionProposal)
+    {
+        TransactionProposals.Enqueue(new Tuple<string, byte[]>(transactionProposal._network_node,transactionProposal._decree));
     }
 
     private async Task IncrementBallotId()
