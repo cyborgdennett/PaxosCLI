@@ -35,6 +35,11 @@ public class Acceptor
         }
     }
 
+    public async Task OnReceiveBeginTransaction(BeginTransaction beginTransactionMsg)
+    {
+          
+    }
+
     /// <summary>
     ///   Informs president p of previously voted for decrees.
     ///   It's a promise of node q to not vote for a ballot with a lower id.

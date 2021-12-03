@@ -152,6 +152,15 @@ public static class MessageHelper
                                                       decreeSS, decreeIdSS,
                                                       ballotIdBB, decreeBB);
                     }
+                case "BT":
+                    {
+                        string network_name = messageInformation[2];
+                        int transactionID = int.Parse(messageInformation[3]);
+                        long decreeID = long.Parse(messageInformation[3]);
+                        int[] sendToIds = Array.ConvertAll(splitMessage[1].Split(","), int.Parse);
+
+                        return new BeginTransaction(messageId, senderId, network_name, transactionID, decreeID, sendToIds);
+                    }
                 default:
                     {
                         Console.WriteLine("Unknown message type.");
@@ -520,5 +529,34 @@ public class TransactionProposal: Message
                                                                 _id.ToString(CultureInfo.InvariantCulture),
                                                                 _network_node,
                                                                 MessageHelper.ByteArrayToString(_decree)));
+    }
+}
+
+public class BeginTransaction : Message
+{
+    public string _network_name;
+    public int _transactionID;
+    public long _decreeID;
+    public int[] _sendToIds;
+
+    public BeginTransaction(long messageIdCounter, int senderId, string network_name, int transactionID, long decreeID, int[] sendToIds)
+    {
+        _doResend = true;
+        _id = MessageHelper.CreateUniqueMessageId(messageIdCounter, senderId);
+        _senderId = senderId;
+        _network_name = network_name;
+        _transactionID = transactionID;
+        _decreeID = decreeID;
+        _sendToIds = sendToIds;
+    }
+
+    public override byte[] ToByteArray()
+    {
+        return MessageHelper.StringToByteArray(String.Format("{0},BT,{1},{2},{3};{4}",
+                                                                _id.ToString(CultureInfo.InvariantCulture),
+                                                                _network_name,
+                                                                _transactionID.ToString(),
+                                                                _decreeID.ToString(),
+                                                                string.Join(",",_sendToIds)));
     }
 }

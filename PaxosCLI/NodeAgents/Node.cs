@@ -72,6 +72,11 @@ public class Node
     public bool isFill;
     public bool isNewDecree;
     public long entryId;
+    internal int senderId;
+    internal string network_name;
+    internal int transactionID;
+    internal long decreeID;
+    internal int[] sendToIds;
 
     //keeping track of time
     public static readonly int MINUTE_IN_PAXOS_TIME = 46; //see thesis why I chose this value (45.45ms)

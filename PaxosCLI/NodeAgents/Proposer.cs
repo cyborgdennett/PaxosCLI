@@ -669,6 +669,36 @@ public class Proposer
     /// will be executed for this decree.
     /// </summary>
     /// <param name="decreeProposal"></param>
+    private async Task<int> SendBeginTransaction()
+    {
+        if (_parentNode.status == NodeStatus.polling && _parentNode.isPresident)
+        {
+            TimeAtPreviousAction = DateTime.Now;
+            BeginTransaction beginTransactionMsg = new BeginTransaction(_parentNode.Client._messageIdCounter, _parentNode.senderId, _parentNode.network_name, 
+                                                                        _parentNode.transactionID, _parentNode.decreeID, _parentNode.sendToIds);
+            await _parentNode.Client.SendMessageToCluster(beginTransactionMsg, _parentNode.quorum.GetClusterExcludingNode(_parentNode), true);
+
+            //send this message to own acceptor
+            //devide all the external ID's over the acceptors
+            await _parentNode.Acceptor.OnReceiveBeginBallot(beginTransactionMsg);
+
+            while (_parentNode.voters.Count() < _parentNode.quorum.Count())
+            {
+                //wait for every quorum member to reply
+                if ((DateTime.Now - TimeAtPreviousAction).TotalMilliseconds >= Node.MINUTE_IN_PAXOS_TIME * 22)
+                {
+                    return 1;
+                }
+            }
+            return 0;
+        }
+        else
+        {
+            Console.WriteLine("[Proposer] Cannot send beginballot message, because not polling.");
+        }
+        return 1;
+    }
+
     public void OnDecreeProposal(DecreeProposal decreeProposal)
     {
         Proposals.Enqueue(decreeProposal._decree);
