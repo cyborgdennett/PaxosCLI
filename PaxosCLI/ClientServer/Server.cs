@@ -91,9 +91,9 @@ public class Server
                 break;
             case "SuccessBeginBallot":
                 //TODO: not finished!!!
+                Console.WriteLine("Received SuccessBeginBallot message");
                 SuccessBeginBallot successBeginBallotMsg = (SuccessBeginBallot)receivedMessage;
-                await _parentNode.Learner.ReceiveSuccess((Success)successBeginBallotMsg.successMsg);
-                await _parentNode.Acceptor.OnReceiveBeginBallot((BeginBallot)successBeginBallotMsg.beginBallotMsg);
+                await _parentNode.Acceptor.OnReceiveSuccessBeginBallot(successBeginBallotMsg);
                 break;
             case "BeginBallot":
                 BeginBallot beginBallot = (BeginBallot)receivedMessage;
@@ -118,8 +118,8 @@ public class Server
                 break;
             case "TransactionProposal":
                 TransactionProposal transactionProposal = (TransactionProposal)receivedMessage;
-                Console.WriteLine("Received a new transaction proposal for [{0}] to network [{1}]", 
-                    MessageHelper.ByteArrayToString(transactionProposal._decree),transactionProposal._network_node);
+                Console.WriteLine("Received a new transaction proposal to network [{1}] for [{0}] ", 
+                    MessageHelper.ByteArrayToString(transactionProposal._decree),transactionProposal._networkName);
                 _parentNode.Proposer.OnTransactionProposal(transactionProposal);
                 break;
             case "RequestMissingEntriesMessage":

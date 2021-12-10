@@ -117,12 +117,6 @@ public static class MessageHelper
                         byte[] decree = StringToByteArray(messageContent[0]);
                         return new DecreeProposal(messageId, senderId, decree);
                     }
-                case "TP":
-                    {
-                        byte[] decree = StringToByteArray(messageContent[0]);
-                        string network_node = messageInformation[2];
-                        return new TransactionProposal(messageId, senderId, network_node, decree);
-                    }
                 case "RME":
                     {
                         long decreeId = long.Parse(messageContent[0]);
@@ -151,6 +145,38 @@ public static class MessageHelper
                         return new SuccessBeginBallot(messageId, senderId, 
                                                       decreeSS, decreeIdSS,
                                                       ballotIdBB, decreeBB);
+                    }
+                case "TP":
+                    {
+                        byte[] decree = StringToByteArray(messageContent[0]);
+                        string network_node = messageInformation[2];
+                        return new TransactionProposal(messageId, senderId, network_node, decree);
+                    }
+                case "BT":
+                    {
+                        string network_name = messageInformation[2];
+                        int transactionID = int.Parse(messageInformation[3]);
+                        decimal decreeID = decimal.Parse(messageInformation[3]);
+                        int[] sendToIds = Array.ConvertAll(splitMessage[1].Split(","), int.Parse);
+
+                        return new BeginTransaction(messageId, senderId, network_name, transactionID, decreeID, sendToIds);
+                    }
+                case "TS":
+                    {
+                        string networkName = messageInformation[2];
+                        int transactionId = Int16.Parse(messageInformation[3]);
+                        byte[] decree = StringToByteArray(messageContent[0]);
+
+                        return new Transaction(messageId, senderId, networkName, decree, transactionId);
+                    }
+                case "TC":
+                    {
+                        string networkName = messageInformation[2];
+                        int transactionId = Int16.Parse(messageInformation[3]);
+                        decimal ballotId = Decimal.Parse(messageInformation[4]);
+                        byte[] decree = StringToByteArray(messageContent[0]);
+                        
+                        return new TransactionConfirmation(messageId, senderId, networkName, decree, transactionId, ballotId);
                     }
                 default:
                     {
@@ -502,15 +528,16 @@ public class InformMissingEntriesMessage: Message
 /// </summary>
 public class TransactionProposal: Message
 {
-    public string _network_node;
-    public byte[] _decree { get; private set; }
+    public string _networkName;
+    public byte[] _decree;
 
-    public TransactionProposal(long messageIdCounter, int senderId, string network_node, byte[] decree)
+    public TransactionProposal(long messageIdCounter, int senderId, string networkName, byte[] decree)
     {
         _doResend = true;
         _id = MessageHelper.CreateUniqueMessageId(messageIdCounter, senderId);
         _senderId = senderId;
-        _network_node = network_node;
+
+        _networkName = networkName;
         _decree = decree;
     }
 
@@ -518,7 +545,93 @@ public class TransactionProposal: Message
     {
         return MessageHelper.StringToByteArray(String.Format("{0},TP,{1};{2}",
                                                                 _id.ToString(CultureInfo.InvariantCulture),
-                                                                _network_node,
+                                                                _networkName,
+                                                                _decree));
+    }
+}
+
+public class BeginTransaction : Message
+{
+    public string _network_name;
+    public int _transactionID;
+    public decimal _decreeID;
+    public int[] _sendToIds;
+
+    public BeginTransaction(long messageIdCounter, int senderId, string network_name, int transactionID, decimal decreeID, int[] sendToIds)
+    {
+        _doResend = true;
+        _id = MessageHelper.CreateUniqueMessageId(messageIdCounter, senderId);
+        _senderId = senderId;
+        _network_name = network_name;
+        _transactionID = transactionID;
+        _decreeID = decreeID;
+        _sendToIds = sendToIds;
+    }
+    public override byte[] ToByteArray()
+    {
+        return MessageHelper.StringToByteArray(String.Format("{0},BT,{1},{2},{3};{4}",
+                                                                _id.ToString(CultureInfo.InvariantCulture),
+                                                                _network_name,
+                                                                _transactionID.ToString(),
+                                                                _decreeID.ToString(),
+                                                                string.Join(",", _sendToIds)));
+    }
+}
+/// <summary>
+/// Transaction Message, Send this to a node of the other network
+/// </summary>
+public class Transaction : Message
+{
+    public string _networkName;
+    public byte[] _decree;
+    public int _transactionId;
+
+    public Transaction(long messageIdCounter, int senderId, string networkName, byte[] decree, int transaction_id)
+    {
+        _doResend = true;
+        _id = MessageHelper.CreateUniqueMessageId(messageIdCounter, senderId);
+        _senderId = senderId;
+
+        _networkName = networkName;
+        _decree = decree;
+        _transactionId = transaction_id;
+    }
+    public override byte[] ToByteArray()
+    {
+        return MessageHelper.StringToByteArray(String.Format("{0},TS,{1},{2};{3}",
+                                                                _id.ToString(CultureInfo.InvariantCulture),
+                                                                _networkName,
+                                                                _transactionId,
+                                                                MessageHelper.ByteArrayToString(_decree)));
+    }
+}
+
+class TransactionConfirmation : Message
+{
+    public byte[] _decree;
+    public int _transactionId;
+    public string _networkName;
+    public decimal _ballotId;
+
+    public TransactionConfirmation(long messageIdCounter, int senderId, string networkName, byte[] decree, int transactionId, decimal ballotId)
+    {
+        _doResend = true;
+        _id = MessageHelper.CreateUniqueMessageId(messageIdCounter, senderId);
+        _senderId = senderId;
+
+        _networkName = networkName;
+        _decree = decree;
+        _transactionId = transactionId;
+        _ballotId = ballotId;
+    }
+
+    public override byte[] ToByteArray()
+    {
+        return MessageHelper.StringToByteArray(String.Format("{0},TC,{1},{2},{3};{4}",
+                                                                _id.ToString(CultureInfo.InvariantCulture),
+                                                                _networkName,
+                                                                _transactionId,
+                                                                _ballotId,
                                                                 MessageHelper.ByteArrayToString(_decree)));
     }
 }

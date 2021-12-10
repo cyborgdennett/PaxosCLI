@@ -94,6 +94,15 @@ public class Acceptor
         await _parentNode.Client.SendMessageToNode(request, nextBallotMsg._senderId, true, true);
     }
 
+    public async Task OnReceiveSuccessBeginBallot(SuccessBeginBallot successBeginBallotMsg)
+    {
+        Console.WriteLine("[Acceptor] Received Success-Beginballot from {1}",
+                           successBeginBallotMsg._senderId);
+
+        await _parentNode.Learner.ReceiveSuccess((Success)successBeginBallotMsg.successMsg);
+        await _parentNode.Acceptor.OnReceiveBeginBallot((BeginBallot)successBeginBallotMsg.beginBallotMsg);
+
+    }
     public async Task OnReceiveBeginBallot(BeginBallot beginBallotMsg)
     {
         Console.WriteLine("[Acceptor] Received beginballot [{0}] from {1}",

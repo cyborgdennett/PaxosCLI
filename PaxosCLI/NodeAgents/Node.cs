@@ -31,8 +31,9 @@ public enum NodeStatus
 public class Node
 {
     private bool canExecute = true;
-    private static readonly string NODES_FILE_PATH = "nodes.csv";
-
+    private static string NODES_FILE_PATH = "Nodes/nodes.csv";
+    public bool CompressedPaxos { get; set; }
+    public string NetworkName { get; private set; }
     public int Id { get; private set; }
     public IPAddress IPAddress { get; private set; }
     public int PortNumber { get; private set; }
@@ -42,6 +43,7 @@ public class Node
     public Client Client { get; private set; }
     public Server Server { get; private set; }
     public UdpClient Socket { get; private set; }
+    public Cluster OtherNetworkNodes { get; private set; }
     public Cluster AllNodes { get; private set; }
     public Cluster Peers { get; private set; }
     public Cluster OnlinePeers { get; private set; }
@@ -99,6 +101,23 @@ public class Node
     public Node()
     {
         PrepareDB(); //DISABLE WHEN NOT NEEDED. SQLite needs this.
+        GetConnectionInformation();
+        if (canExecute)
+        {
+            InitRoles();
+            GetLedgerVariables();
+            ConnectToNetwork().Wait();
+        }
+    }
+
+    /// <summary>
+    /// Constructor to start the own Node with the name of its own network.
+    /// </summary>
+    /// <param name="networkName"></param>
+    public Node(string networkName)
+    {
+        PrepareDB(); //DISABLE WHEN NOT NEEDED. SQLite needs this.
+        NetworkName = networkName;
         GetConnectionInformation();
         if (canExecute)
         {
@@ -167,6 +186,7 @@ public class Node
                 Console.WriteLine("Own IPv4: {0}", IPAddress);
 
                 Peers = new Cluster();
+                NODES_FILE_PATH = NetworkName == "" ? NODES_FILE_PATH : ("Nodes/" + NetworkName + ".csv");
                 string[] endpoints = File.ReadAllLines(NODES_FILE_PATH);
                 bool foundSelf = false;
                 bool skippedFirst = false;
@@ -242,6 +262,7 @@ public class Node
             canExecute = false;
         }
     }
+    
 
     /// <summary>
     /// Gets the local active ip address. So if on wired connection, it will get the wired IPv4. 
@@ -284,7 +305,7 @@ public class Node
     /// </summary>
     /// <param name="port">The port number to check</param>
     /// <returns>true = port in use; false = port is not in use</returns>
-    private bool CheckPortInUse(int port)
+    public bool CheckPortInUse(int port)
     {
         return IPGlobalProperties
             .GetIPGlobalProperties()
