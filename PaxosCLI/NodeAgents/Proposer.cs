@@ -158,7 +158,7 @@ public class Proposer
     /// <returns></returns>
     public async Task ExecutePaxosLoop(byte[] proposedDecree, bool isFill = false, bool isNewDecree = false, long entryId = 0)
     {
-        Success? success = null;
+        byte[] success = null;
         int ballotSuccessful = 1;
         while (Proposals.Count() >= 1)
         { 
@@ -173,7 +173,9 @@ public class Proposer
                 
                 if (ballotSuccessful == 0 && await Succeed() == 1)
                 {
-                    byte[] outcome = await LedgerHelper.GetOutcome(_parentNode.entryId);
+                    success = await LedgerHelper.GetOutcome(_parentNode.entryId);
+                    if (success == null)
+                        return;
 
                     proposedDecree = Proposals.Dequeue();
                     //send a SuccessBeginBallotMessage
@@ -181,12 +183,13 @@ public class Proposer
                     {
                         quorum = GetOnlineNodes();
                         _parentNode.status = NodeStatus.trying;
-                        ballotSuccessful = await StartPollingMajoritySet(quorum, proposedDecree, isFill, isNewDecree, entryId, outcome, _parentNode.entryId);
+                        ballotSuccessful = await StartPollingMajoritySet(quorum, proposedDecree, isFill, isNewDecree, entryId, success, _parentNode.entryId);
                     } while (ballotSuccessful == 1);
                 }
                 else if (ballotSuccessful == 2)
                 {
                     Console.WriteLine("[Proposer] Aborting CompressedPaxos");
+                    _parentNode.CompressedPaxos = false;
                     return;
                 }
                 //This is only used for the first iteration
