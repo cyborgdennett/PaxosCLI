@@ -866,7 +866,7 @@ public class Proposer
 
             //send this message to own acceptor
             //devide all the external ID's over the acceptors
-            await _parentNode.Acceptor.OnReceiveBeginBallot(beginTransactionMsg);
+            await _parentNode.Acceptor.OnReceiveBeginTransaction(beginTransactionMsg);
 
             while (_parentNode.voters.Count() < _parentNode.quorum.Count())
             {
