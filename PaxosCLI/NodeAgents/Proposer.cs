@@ -39,7 +39,9 @@ public class Proposer
     /// <returns></returns>
     public Tuple<string, string> Input()
     {
-        return new Tuple<string, string>("",Console.ReadLine());
+        string input = Console.ReadLine();
+        Console.WriteLine(input);
+        return new Tuple<string, string>("",input);
     }
 
     /// <summary>
@@ -73,9 +75,11 @@ public class Proposer
             if(_parentNode.isPresident)
             {
                 if (input.Item1 == "")
+                {
                     Proposals.Enqueue(inputInBytes);
+                }
                 else
-                    TransactionProposals.Enqueue(new Tuple<string,byte[]>(input.Item1, inputInBytes));
+                    TransactionProposals.Enqueue(new Tuple<string, byte[]>(input.Item1, inputInBytes));
             }
             else if (!_parentNode.isPresident)
             {
@@ -171,22 +175,8 @@ public class Proposer
             {
                 Console.WriteLine("\n[Proposer] Executing CompressedPaxos");
                 
-                if (ballotSuccessful == 0 && await Succeed() == 1)
-                {
-                    success = await LedgerHelper.GetOutcome(_parentNode.entryId);
-                    if (success == null)
-                        return;
-
-                    proposedDecree = Proposals.Dequeue();
-                    //send a SuccessBeginBallotMessage
-                    do
-                    {
-                        quorum = GetOnlineNodes();
-                        _parentNode.status = NodeStatus.trying;
-                        ballotSuccessful = await StartPollingMajoritySet(quorum, proposedDecree, isFill, isNewDecree, entryId, success, _parentNode.entryId);
-                    } while (ballotSuccessful == 1);
-                }
-                else if (ballotSuccessful == 2)
+                
+                if (ballotSuccessful == 2)
                 {
                     Console.WriteLine("[Proposer] Aborting CompressedPaxos");
                     _parentNode.CompressedPaxos = false;
@@ -202,6 +192,21 @@ public class Proposer
                         ballotSuccessful = await StartPollingMajoritySet(quorum, proposedDecree, isFill, isNewDecree, entryId);
                     } while (ballotSuccessful == 1);
                     _parentNode.CompressedPaxos = true;
+                }
+                else if (ballotSuccessful == 0 && await Succeed() == 1)
+                {
+                    success = await LedgerHelper.GetOutcome(_parentNode.entryId);
+                    if (success == null)
+                        return;
+
+                    proposedDecree = Proposals.Dequeue();
+                    //send a SuccessBeginBallotMessage
+                    do
+                    {
+                        quorum = GetOnlineNodes();
+                        _parentNode.status = NodeStatus.trying;
+                        ballotSuccessful = await StartPollingMajoritySet(quorum, proposedDecree, isFill, isNewDecree, entryId, success, _parentNode.entryId);
+                    } while (ballotSuccessful == 1);
                 }
             }
             else if (!initFinished)
@@ -480,7 +485,7 @@ public class Proposer
 
                     using (Ledger ledger = new Ledger())
                     {
-                        lastEntryInDb = await ledger.Entries.LastOrDefaultAsync();
+                        lastEntryInDb = await ledger.Entries.OrderBy(l => l.Id).LastOrDefaultAsync();
                     }
 
                     if (lastEntryInDb != null)
@@ -774,13 +779,16 @@ public class Proposer
                             && _parentNode.status == NodeStatus.idle
                             && GetOnlineNodes().HasMajorityOf(_parentNode.AllNodes))
                         {
-                            byte[] toBallot = Proposals.Dequeue();
+                            Console.WriteLine("Do we get this?");
+                            
                             if (Proposals.Count() == 1)
                             {
+                                byte[] toBallot = Proposals.Dequeue();
                                 await ExecutePaxos(toBallot, false, true, 0);
                             }
                             else
                             {
+                                byte[] toBallot = Proposals.Dequeue();
                                 await ExecutePaxosLoop(toBallot, false, true, 0);
                             }
                         }

@@ -33,7 +33,7 @@ public class Node
     private bool canExecute = true;
     private static string NODES_FILE_PATH = "Nodes/nodes.csv";
     public bool CompressedPaxos { get; set; }
-    public string NetworkName { get; private set; }
+    public string NetworkName { get; private set; } = "";
     public int Id { get; private set; }
     public IPAddress IPAddress { get; private set; }
     public int PortNumber { get; private set; }
@@ -192,6 +192,8 @@ public class Node
 
                 Peers = new Cluster();
                 NODES_FILE_PATH = NetworkName == "" ? NODES_FILE_PATH : ("Nodes/" + NetworkName + ".csv");
+                Console.WriteLine(NODES_FILE_PATH);
+
                 string[] endpoints = File.ReadAllLines(NODES_FILE_PATH);
                 bool foundSelf = false;
                 bool skippedFirst = false;
