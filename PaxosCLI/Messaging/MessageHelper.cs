@@ -146,23 +146,34 @@ public static class MessageHelper
                     }
                 case "TP":
                     {
-                        return new TransactionProposal(messageIdCounter, senderId, networkName, decree)
+                        string networkName = messageInformation[2];
+                        byte[] decree = StringToByteArray(messageContent[1]);
+                        return new TransactionProposal(messageId, senderId, networkName, decree);
                     }
                 case "FL":
                     {
-                        return new FindLeader(messageIdCounter, senderId, networkName)
+                        string networkName = messageInformation[2];
+                        return new FindLeader(messageId, senderId, networkName);
                     }
                 case "L":
                     {
-                        return new Leader(messageIdCounter, senderId, )
+                        string networkName = messageInformation[2];
+                        int Ip = messageInformation[3]
+                        string Ip = messageInformation[4]
+                        return new Leader(messageId, senderId, networkName, Id, Ip);
                     }
                 case "T":
                     {
-                        return new Transaction(long messageIdCounter, int senderId, )
+                        string networkName = messageInformation[2];
+                        byte[] decree = StringToByteArray(messageContent[1]);
+                        string transactionId = messageInformation[3]
+                        return new Transaction(messageId, senderId, networkName, transactionId, decree);
                     }
                 case "TS":
-                    {
-                        return new TransactionSuccess(long messageIdCounter, int senderId, )
+                    {                       
+                        string transactionId = messageInformation[3]
+                        string networkName = messageInformation[2];
+                        return new TransactionSuccess(messageId, senderId, networkName, transactionId);
                     }
                 default:
                     {
