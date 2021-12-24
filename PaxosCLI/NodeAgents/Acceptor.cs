@@ -1,7 +1,5 @@
-﻿using System;
+﻿using PaxosCLI.Database;
 using PaxosCLI.Messaging;
-using System.Threading.Tasks;
-using PaxosCLI.Database;
 
 namespace PaxosCLI.NodeAgents;
 
@@ -35,9 +33,9 @@ public class Acceptor
         }
     }
 
-    public async Task OnReceiveBeginTransaction(BeginTransaction beginTransactionMsg)
+    public async Task OnReceiveTransaction(Transaction transactionMsg)
     {
-          
+
     }
 
     /// <summary>
@@ -164,9 +162,9 @@ public class Acceptor
     /// </summary>
     private async Task ReplyNextBal(int peerId)
     {
-            Console.WriteLine("[Acceptor] Sending nextBal to president {0}.", peerId);
-            UpdateBallotNumber newBallot = new UpdateBallotNumber(_parentNode.Client._messageIdCounter, _parentNode.Id, _parentNode.nextBal);
-            await _parentNode.Client.SendMessageToNode(newBallot, peerId, true, true);
+        Console.WriteLine("[Acceptor] Sending nextBal to president {0}.", peerId);
+        UpdateBallotNumber newBallot = new UpdateBallotNumber(_parentNode.Client._messageIdCounter, _parentNode.Id, _parentNode.nextBal);
+        await _parentNode.Client.SendMessageToNode(newBallot, peerId, true, true);
     }
 }
 

@@ -1,16 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Net;
-using System.Net.Sockets;
-using System.Net.NetworkInformation;
-using System.IO;
-using System.Threading.Tasks;
-using System.Linq;
+﻿using Microsoft.EntityFrameworkCore;
 using PaxosCLI.ClientServer;
-using PaxosCLI.Messaging;
-using Microsoft.EntityFrameworkCore;
 using PaxosCLI.Database;
+using PaxosCLI.Messaging;
 using PaxosCLI.SensorData;
+using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 
 namespace PaxosCLI.NodeAgents;
 /// <summary>
@@ -47,7 +42,6 @@ public class Node
     public Cluster AllNodes { get; private set; }
     public Cluster Peers { get; private set; }
     public Cluster OnlinePeers { get; private set; }
-
     public Proposer Proposer { get; private set; }
     public Acceptor Acceptor { get; private set; }
     public Learner Learner { get; private set; }
@@ -137,7 +131,7 @@ public class Node
     /// </summary>
     public Node(PortChat a, Boolean test)
     {
-        testBool = test; 
+        testBool = test;
         sensorData = a;
         PrepareDB(); //DISABLE WHEN NOT NEEDED. SQLite needs this.
         GetConnectionInformation();
@@ -234,7 +228,8 @@ public class Node
                             Socket = new UdpClient(EndPoint);
                             Console.WriteLine(ToString());
                             continue;
-                        }else
+                        }
+                        else
                         {
                             Console.WriteLine("Port {0} already in use.", e_port);
                         }
@@ -269,7 +264,7 @@ public class Node
             canExecute = false;
         }
     }
-    
+
 
     /// <summary>
     /// Gets the local active ip address. So if on wired connection, it will get the wired IPv4. 

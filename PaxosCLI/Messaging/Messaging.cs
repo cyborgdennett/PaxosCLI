@@ -1,6 +1,4 @@
-﻿using System;
-using System.Text;
-using PaxosCLI.NodeAgents;
+﻿using PaxosCLI.NodeAgents;
 using System.Globalization;
 
 namespace PaxosCLI.Messaging;
@@ -226,14 +224,14 @@ public class Success : Message
 /// <summary>
 /// Add Success and BeginBallot in one message. New signature is "SBB"
 /// </summary>
-public class SuccessBeginBallot : Message 
+public class SuccessBeginBallot : Message
 {
     public BeginBallot beginBallotMsg;
     public Success successMsg;
 
-    public SuccessBeginBallot(long messageIdCounter, int senderId, 
+    public SuccessBeginBallot(long messageIdCounter, int senderId,
                               byte[] decree, long decreeId,
-                              decimal ballotIdBB, byte[] decreeBB) 
+                              decimal ballotIdBB, byte[] decreeBB)
     {
         successMsg = new Success(messageIdCounter, senderId, decree, decreeId);
         beginBallotMsg = new BeginBallot(messageIdCounter, senderId, ballotIdBB, decreeBB);
@@ -242,8 +240,8 @@ public class SuccessBeginBallot : Message
     {
         return MessageHelper.StringToByteArray(String.Format("{0},SBB;",
                                                                 _id.ToString(CultureInfo.InvariantCulture))
-                                                                + successMsg.ToString().Split(";")[1] + ";" 
-                                                                + beginBallotMsg.ToString().Split(";")[1]);                                  
+                                                                + successMsg.ToString().Split(";")[1] + ";"
+                                                                + beginBallotMsg.ToString().Split(";")[1]);
     }
 }
 
@@ -289,7 +287,7 @@ public class DecreeProposal : Message
     }
 }
 
-public class RequestMissingEntriesMessage: Message
+public class RequestMissingEntriesMessage : Message
 {
     public long _decreeId { get; private set; }
     public string _entriesInOwnLedgerString;
@@ -313,7 +311,7 @@ public class RequestMissingEntriesMessage: Message
     }
 }
 
-public class InformMissingEntriesMessage: Message
+public class InformMissingEntriesMessage : Message
 {
     public string _entriesString { get; private set; }
 

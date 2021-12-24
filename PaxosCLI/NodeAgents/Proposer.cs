@@ -1,12 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using PaxosCLI.Messaging;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using PaxosCLI.Database;
-using System.Net;
+using PaxosCLI.Messaging;
 
 namespace PaxosCLI.NodeAgents;
 
@@ -41,7 +35,7 @@ public class Proposer
     {
         string input = Console.ReadLine();
         Console.WriteLine(input);
-        return new Tuple<string, string>("",input);
+        return new Tuple<string, string>("", input);
     }
 
     /// <summary>
@@ -59,27 +53,29 @@ public class Proposer
             Thread.Sleep(100);
         }
 
-            
+
         //TODO: create system that can use different inputs
         while (_parentNode.Client.IsSending && _parentNode.Server.isListening)
         {
             Thread.Sleep(1000);
 
-            Tuple<string, string> input = Input();
-
-            if (input.Item2 == "") continue;
-
-               
-            byte[] inputInBytes = MessageHelper.StringToByteArray(input.Item2);
-
-            if(_parentNode.isPresident)
+            string input = "";
+            if (!_parentNode.testBool)
             {
-                if (input.Item1 == "")
-                {
-                    Proposals.Enqueue(inputInBytes);
-                }
-                else
-                    TransactionProposals.Enqueue(new Tuple<string, byte[]>(input.Item1, inputInBytes));
+                input = _parentNode.sensorData.Read().Trim();
+                if (input == "") continue;
+            }
+            else
+            {
+                input = Console.ReadLine();
+            }
+
+
+            byte[] inputInBytes = MessageHelper.StringToByteArray(input);
+
+            if (_parentNode.isPresident)
+            {
+                Proposals.Enqueue(inputInBytes);   
             }
             else if (!_parentNode.isPresident)
             {
@@ -92,20 +88,10 @@ public class Proposer
                     }
                 }
 
-                //send the proposal to the president
-                if (input.Item1 == "")
-                {
-                    DecreeProposal decreeProposal = new DecreeProposal(_parentNode.Client._messageIdCounter,
-                                                                    _parentNode.Id, inputInBytes);
-                    await _parentNode.Client.SendMessageToNode(decreeProposal, _parentNode.PresidentNode, true, true);
-                }
-                else
-                {
-                    TransactionProposal transactionProposal = new TransactionProposal(
-                        _parentNode.Client._messageIdCounter, _parentNode.Id, input.Item1, inputInBytes);
-                    await _parentNode.Client.SendMessageToNode(transactionProposal, _parentNode.PresidentNode, true, true);
-                }
-                
+                //send the proposal to the president                
+                DecreeProposal decreeProposal = new DecreeProposal(_parentNode.Client._messageIdCounter,
+                                                                _parentNode.Id, inputInBytes);
+                await _parentNode.Client.SendMessageToNode(decreeProposal, _parentNode.PresidentNode, true, true);
             }
         }
     }
@@ -128,7 +114,7 @@ public class Proposer
             && initFinished)
         {
             Console.WriteLine("\n[Proposer] Executing Paxos");
-            
+
             int ballotSuccessful = 1;
             do
             {
@@ -165,7 +151,7 @@ public class Proposer
         byte[] success = null;
         int ballotSuccessful = 1;
         while (Proposals.Count() >= 1)
-        { 
+        {
             Cluster quorum = GetOnlineNodes();
             bool initFinished = ((!isNewDecree && !presidentInitTaskFinished) || presidentInitTaskFinished);
 
@@ -174,8 +160,8 @@ public class Proposer
                 && initFinished)
             {
                 Console.WriteLine("\n[Proposer] Executing CompressedPaxos");
-                
-                
+
+
                 if (ballotSuccessful == 2)
                 {
                     Console.WriteLine("[Proposer] Aborting CompressedPaxos");
@@ -222,60 +208,34 @@ public class Proposer
         //if you are at your own networkname, you can stop the procedure and send a success message to the other Leader
         if (_parentNode.NetworkName == network)
         {
-            Console.WriteLine("Transaction Error: Cannot send transaction to own network");
+            Console.WriteLine("[Proposer] Transaction Error: Cannot send transaction to own network");
             return;
         }
         string NETWORK_FILE_PATH = "Nodes/" + network + ".csv";
-        Stack<string> endpoints = new Stack<string>( File.ReadAllLines(NETWORK_FILE_PATH) );
+        Stack<string> endpoints = new Stack<string>(File.ReadAllLines(NETWORK_FILE_PATH));
         if (endpoints.Count == 0)
         {
-            Console.WriteLine("Transaction Error: Network " + NETWORK_FILE_PATH + " not found");
+            Console.WriteLine("[Proposer] Transaction Error: Network " + NETWORK_FILE_PATH + " not found");
             return;
         }
         int networkSize = endpoints.Count;
         Random rand = new Random();
         //create random transactionId
-        int transactionId = rand.Next(0, 1000000);
+        int transactionId = rand.Next(0, int.MaxValue);
 
+        //Find Leader
+        FindLeader findLeaderMsg = new FindLeader(_parentNode.Client._messageIdCounter, _parentNode.Id, network);
+        TimeAtPreviousAction = DateTime.Now();
+        while ((DateTime.Now() - TimeAtPreviousAction).TotalSeconds() < 2)
+        {
+            await LeaderFound();
+        }
+
+    }
+
+    public async Task<int> LeaderFound()
+    {
         
-        //First we need a list of Id's of our online nodes and then link them to neighbour network id's.
-        Cluster cluster = GetOnlineNodes();
-        int onlineNetworkSize = cluster.Count();
-
-        //Distribute online nodes to send to a list of nodes of the other network
-        if (onlineNetworkSize >= networkSize)
-        { //maximum of one node per online network
-            float ratio = (onlineNetworkSize + 1) / networkSize;
-            float accumulator = ratio;
-            foreach (Node n in cluster.Values)
-            {
-
-                accumulator--;
-                if (accumulator < 0)
-                {
-                    int[] nodeId = { Int16.Parse(endpoints.Pop().Split(',')[0]) };
-                    BeginTransaction bt = new BeginTransaction(_parentNode.Client._messageIdCounter, _parentNode.Id, network, transactionId, decreeId, nodeId);
-                    _parentNode.Client.SendMessageToNode(bt, n.Id, false, false);
-                    accumulator += ratio;
-                }
-            }
-        }
-        else
-        { //multiple nodes per online network
-            float ratio = networkSize / (onlineNetworkSize + 1);
-            float accumulator = ratio;
-            foreach (Node n in cluster.Values)
-            {
-                int[] nodeIds = { };
-                for (int i = 0; i < (int)accumulator; i++)
-                {
-                    nodeIds.Append(Int16.Parse(endpoints.Pop().Split(',')[0]));
-                }
-                accumulator = accumulator % 1 + ratio;
-                BeginTransaction bt = new BeginTransaction(_parentNode.Client._messageIdCounter, _parentNode.Id, network, transactionId, decreeId, nodeIds);
-                _parentNode.Client.SendMessageToNode(bt, n.Id, false, false);
-            }
-        }
     }
 
     public async Task<int> TryNewBallot()
@@ -323,7 +283,7 @@ public class Proposer
             Console.WriteLine("[Proposer] Received all lastvotes from chosen set of nodes.");
             return 0;
         }
-        else if(!majorityOnline)
+        else if (!majorityOnline)
         {
             return 1;
         }
@@ -600,11 +560,11 @@ public class Proposer
             Console.WriteLine("[Proposer] Received voted message from {0} for {1}.", voted._senderId, voted._ballotId);
             _parentNode.voters.TryAdd(voted._senderId, _parentNode.AllNodes.GetNodeById(voted._senderId));
         }
-        else if(voted._ballotId != _parentNode.lastTried)
+        else if (voted._ballotId != _parentNode.lastTried)
         {
             Console.WriteLine("[Proposer] Received a voted message from a different kind of ballot. Vote ballotid={0}. lastTried={1}", voted._ballotId, _parentNode.lastTried);
         }
-        else if(_parentNode.status != NodeStatus.polling)
+        else if (_parentNode.status != NodeStatus.polling)
         {
             Console.WriteLine("[Proposer] This node is not polling. Not doing anything with voted message.");
             Console.WriteLine("[Proposer] Status = {0}", _parentNode.status);
@@ -639,8 +599,8 @@ public class Proposer
                                             _parentNode.decree,
                                             _parentNode.entryId);
 
-            
-            
+
+
             await _parentNode.Learner.WriteSingleDecreeToLedgerImmediately(success);
 
             _parentNode.status = NodeStatus.idle;
@@ -762,7 +722,7 @@ public class Proposer
                             Tuple<string, byte[]> toBallot = TransactionProposals.Dequeue();
                             await ExecutePaxos(toBallot.Item2, false, true, 0);
 
-                            
+
                             //Check if the ballot is passed and written in the ledger
                             if (_parentNode.prevDec == toBallot.Item2)
                             {
@@ -771,7 +731,7 @@ public class Proposer
                                 await ExecuteCrossNetwork(_parentNode.prevBal, toBallot.Item1);
                                 break;
                             }
-                            
+
                         }
 
                         //This part is for Decrees
@@ -779,8 +739,7 @@ public class Proposer
                             && _parentNode.status == NodeStatus.idle
                             && GetOnlineNodes().HasMajorityOf(_parentNode.AllNodes))
                         {
-                            Console.WriteLine("Do we get this?");
-                            
+
                             if (Proposals.Count() == 1)
                             {
                                 byte[] toBallot = Proposals.Dequeue();
@@ -868,7 +827,7 @@ public class Proposer
         if (_parentNode.status == NodeStatus.polling && _parentNode.isPresident)
         {
             TimeAtPreviousAction = DateTime.Now;
-            BeginTransaction beginTransactionMsg = new BeginTransaction(_parentNode.Client._messageIdCounter, _parentNode.senderId, _parentNode.network_name, 
+            BeginTransaction beginTransactionMsg = new BeginTransaction(_parentNode.Client._messageIdCounter, _parentNode.senderId, _parentNode.network_name,
                                                                         _parentNode.transactionID, _parentNode.decreeID, _parentNode.sendToIds);
             await _parentNode.Client.SendMessageToCluster(beginTransactionMsg, _parentNode.quorum.GetClusterExcludingNode(_parentNode), true);
 
@@ -904,7 +863,7 @@ public class Proposer
     /// <param name="decreeProposal"></param>
     public void OnTransactionProposal(TransactionProposal transactionProposal)
     {
-        TransactionProposals.Enqueue(new Tuple<string, byte[]>(transactionProposal._networkName,transactionProposal._decree));
+        TransactionProposals.Enqueue(new Tuple<string, byte[]>(transactionProposal._networkName, transactionProposal._decree));
     }
 
     private async Task IncrementBallotId()

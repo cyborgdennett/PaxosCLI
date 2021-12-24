@@ -1,10 +1,6 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using PaxosCLI.NodeAgents;
-using PaxosCLI.Messaging;
 using Microsoft.EntityFrameworkCore;
-using System.Threading.Tasks;
+using PaxosCLI.Messaging;
+using PaxosCLI.NodeAgents;
 
 namespace PaxosCLI.Database;
 
@@ -32,7 +28,7 @@ public static class LedgerHelper
                 LedgerEntry entry = entries.ElementAt(i);
 
                 if (entry.Id != previousId + 1 || entry.Decree.Equals(Proposer.OLIVE_DAY_DECREE))
-                    //TODO stop at olive decrees? See Paxos Blockchain Addendum
+                //TODO stop at olive decrees? See Paxos Blockchain Addendum
                 {
                     break;
                 }
@@ -90,7 +86,7 @@ public static class LedgerHelper
     {
         List<LedgerEntry> writtenEntries = await GetEntries();
         List<int> writtenDecreeIds = writtenEntries.Select(e => (int)e.Id).ToList();
-        List<int> allDecreeIds = Enumerable.Range(1, (int) hasDecreesUntil).ToList();
+        List<int> allDecreeIds = Enumerable.Range(1, (int)hasDecreesUntil).ToList();
         List<int> missingEntries = allDecreeIds.Except(writtenDecreeIds).ToList();
         return string.Join("|", missingEntries);
     }

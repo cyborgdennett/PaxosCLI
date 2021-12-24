@@ -1,12 +1,7 @@
-using System;
-using System.Collections.Generic;
+using PaxosCLI.Messaging;
+using PaxosCLI.NodeAgents;
 using System.Collections.Concurrent;
 using System.Net.Sockets;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Linq;
-using PaxosCLI.NodeAgents;
-using PaxosCLI.Messaging;
 
 namespace PaxosCLI.ClientServer;
 
@@ -23,10 +18,10 @@ public class Client
     private Thread messageArrivalCheckThread;
 
     //Dictionary<messageId, Tuple<msgContent, List<recipientNodeId>>>
-    private ConcurrentDictionary<decimal, Tuple<Message, Cluster>> unconfirmedMessages; 
-        
+    private ConcurrentDictionary<decimal, Tuple<Message, Cluster>> unconfirmedMessages;
+
     //Dictionary<messageId, retriesLeft>. Keeps track of how many times a message has to be resent until's not needed anymore.
-    private ConcurrentDictionary<decimal, int> messageRetries; 
+    private ConcurrentDictionary<decimal, int> messageRetries;
 
     public long _messageIdCounter { get; private set; }
     private static readonly int MAX_MESSAGE_ID = 10000;
@@ -85,7 +80,7 @@ public class Client
         Node node = null;
         parentNode.AllNodes.TryGetValue(nodeId, out node);
 
-        if(node != null)
+        if (node != null)
         {
             await SendMessageToNode(message, node, incrementMsgIdCounter, doUnconfirm);
         }
@@ -115,10 +110,11 @@ public class Client
     /// </summary>
     private void IncrementMessageIdCounter()
     {
-        if(_messageIdCounter >= MAX_MESSAGE_ID)
+        if (_messageIdCounter >= MAX_MESSAGE_ID)
         {
             _messageIdCounter = 1;
-        }else
+        }
+        else
         {
             _messageIdCounter++;
         }

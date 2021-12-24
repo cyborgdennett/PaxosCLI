@@ -1,14 +1,12 @@
-﻿using System;
-using System.Text;
-using PaxosCLI.NodeAgents;
-using System.Globalization;
+﻿using System.Globalization;
 
 namespace PaxosCLI.Messaging;
+
 
 /// <summary>
 /// DecreeProposal + network_node
 /// </summary>
-public class TransactionProposal: Message
+ public class TransactionProposal : Message
 {
     public string _networkName;
     public byte[] _decree;
@@ -32,6 +30,108 @@ public class TransactionProposal: Message
     }
 }
 
+public class FindLeader : Message
+{
+    public string _networkName;
+
+    public FindLeader(long messageIdCounter, int senderId, string networkName)
+    {
+        _doResend = true;
+        _id = MessageHelper.CreateUniqueMessageId(messageIdCounter, senderId);
+        _senderId = senderId;
+
+        _networkName = networkName;
+    }
+
+    public override byte[] ToByteArray()
+    {
+        return MessageHelper.StringToByteArray(String.Format("{0},FL,{1};",
+                                                                _id.ToString(CultureInfo.InvariantCulture),
+                                                                _networkName));
+    }
+}
+
+public class Leader : Message
+{
+    public string _networkName;
+    public int _nodeId;
+    public string _ip;
+
+    public Leader(long messageIdCounter, int senderId, string networkName, int nodeId, string ip)
+    {
+        _doResend = true;
+        _id = MessageHelper.CreateUniqueMessageId(messageIdCounter, senderId);
+        _senderId = senderId;
+
+        _networkName = networkName;
+        _nodeId = nodeId;
+        _ip = ip;
+    }
+
+    public override byte[] ToByteArray()
+    {
+        return MessageHelper.StringToByteArray(String.Format("{0},L,{1};{2},{3}",
+                                                                _id.ToString(CultureInfo.InvariantCulture),
+                                                                _networkName,
+                                                                _nodeId,
+                                                                _ip));
+    }
+}
+
+public class Transaction : Message
+{
+    public int _transactionId;
+    public string _networkName;
+    public byte[] _decree;
+
+    public Transaction(long messageIdCounter, int senderId, string networkName, int transactionId, byte[] decree)
+    {
+        _doResend = true;
+        _id = MessageHelper.CreateUniqueMessageId(messageIdCounter, senderId);
+        _senderId = senderId;
+
+        _networkName = networkName;
+        _transactionId = transactionId;
+        _decree = decree;
+    }
+
+    public override byte[] ToByteArray()
+    {
+        return MessageHelper.StringToByteArray(String.Format("{0},T,{1},{2};{3}",
+                                                                _id.ToString(CultureInfo.InvariantCulture),
+                                                                _networkName,
+                                                                _transactionId,
+                                                                _decree));
+    }
+
+}
+
+public class TransactionSuccess : Message
+{
+    public int _transactionId;
+    public string _networkName;
+
+    public TransactionSuccess(long messageIdCounter, int senderId, string networkName, int transactionId)
+    {
+        _doResend = true;
+        _id = MessageHelper.CreateUniqueMessageId(messageIdCounter, senderId);
+        _senderId = senderId;
+
+        _networkName = networkName;
+        _transactionId = transactionId;
+    }
+
+    public override byte[] ToByteArray()
+    {
+        return MessageHelper.StringToByteArray(String.Format("{0},TS,{1},{2};",
+                                                                _id.ToString(CultureInfo.InvariantCulture),
+                                                                _networkName,
+                                                                _transactionId));
+    }
+} 
+
+
+/* PART of OLD PROTOCOL
 public class BeginTransaction : Message
 {
     public string _network_name;
@@ -118,4 +218,4 @@ class TransactionConfirmation : Message
     }
 }
 
-
+*/

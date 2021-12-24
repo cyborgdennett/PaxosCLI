@@ -17,7 +17,7 @@ public class Ledger : DbContext
     {
         // At the moment the SQLite database provider is used to store data.
         // It can be changed to many kinds of databases. See https://docs.microsoft.com/en-us/ef/core/providers/
-        optionsBuilder.UseSqlite("Data Source=ledger.db"); 
+        optionsBuilder.UseSqlite("Data Source=ledger.db");
     }
 
     /// <summary>
@@ -28,13 +28,13 @@ public class Ledger : DbContext
     {
         modelBuilder.Entity<PaxosProgress>()
             .HasData(new PaxosProgress
-                    {
-                        Id = 1,
-                        LastTried = decimal.MinValue,
-                        NextBal = decimal.MinValue,
-                        PrevBal =  decimal.MinValue,
-                        PrevDec = new byte[] {}
-                    });
+            {
+                Id = 1,
+                LastTried = decimal.MinValue,
+                NextBal = decimal.MinValue,
+                PrevBal = decimal.MinValue,
+                PrevDec = new byte[] { }
+            });
     }
 }
 

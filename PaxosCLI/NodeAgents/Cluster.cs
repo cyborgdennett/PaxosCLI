@@ -1,9 +1,5 @@
-
-using System;
 using System.Collections.Concurrent;
 using System.Net;
-using System.Linq;
-using System.Collections.Generic;
 
 namespace PaxosCLI.NodeAgents;
 /// <summary>
@@ -18,7 +14,7 @@ public class Cluster : ConcurrentDictionary<int, Node>
 
     public Cluster(List<Node> peers)
     {
-        foreach(var peer in peers)
+        foreach (var peer in peers)
         {
             TryAdd(peer.Id, peer);
         }
@@ -27,7 +23,7 @@ public class Cluster : ConcurrentDictionary<int, Node>
 
     public Cluster(Cluster otherCluster)
     {
-        foreach(var node in otherCluster.Values)
+        foreach (var node in otherCluster.Values)
         {
             TryAdd(node.Id, node);
         }
@@ -45,7 +41,7 @@ public class Cluster : ConcurrentDictionary<int, Node>
 
     public Node GetNodeById(int id)
     {
-        if(ContainsKey(id))
+        if (ContainsKey(id))
             return this[id];
         else
             return new Node(Int32.MinValue, IPAddress.Parse("127.0.0.1"), 0); //No such node exists

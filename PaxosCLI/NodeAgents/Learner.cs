@@ -1,10 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using PaxosCLI.Messaging;
-using Microsoft.EntityFrameworkCore;
-using System.Threading.Tasks;
-using System.Linq;
+﻿using Microsoft.EntityFrameworkCore;
 using PaxosCLI.Database;
+using PaxosCLI.Messaging;
+using PaxosCLI.State;
 
 namespace PaxosCLI.NodeAgents;
 /// <summary>
@@ -28,6 +25,7 @@ public class Learner
 
     public Learner(Node parentNode)
     {
+        receivedEntries = new List<LedgerEntry>();
         _parentNode = parentNode;
 
         if (!writeImmediately)
@@ -88,6 +86,7 @@ public class Learner
         {
             await WriteSingleDecreeToLedgerImmediately(success);
         }
+        //await NetworkStateMachine.update();
     }
 
     public async Task WriteSingleDecreeToLedgerImmediately(Success success)

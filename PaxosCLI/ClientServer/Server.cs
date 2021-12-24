@@ -1,13 +1,8 @@
-using System;
-using System.Collections.Generic;
+using PaxosCLI.Database;
+using PaxosCLI.Messaging;
+using PaxosCLI.NodeAgents;
 using System.Net;
 using System.Net.Sockets;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Linq;
-using PaxosCLI.NodeAgents;
-using PaxosCLI.Messaging;
-using PaxosCLI.Database;
 
 namespace PaxosCLI.ClientServer;
 
@@ -115,13 +110,7 @@ public class Server
                 DecreeProposal decreeProposal = (DecreeProposal)receivedMessage;
                 Console.WriteLine("Received a new decree proposal for [{0}]", MessageHelper.ByteArrayToString(decreeProposal._decree));
                 _parentNode.Proposer.OnDecreeProposal(decreeProposal);
-                break;
-            case "TransactionProposal":
-                TransactionProposal transactionProposal = (TransactionProposal)receivedMessage;
-                Console.WriteLine("Received a new transaction proposal to network [{1}] for [{0}] ", 
-                    MessageHelper.ByteArrayToString(transactionProposal._decree),transactionProposal._networkName);
-                _parentNode.Proposer.OnTransactionProposal(transactionProposal);
-                break;
+                break
             case "RequestMissingEntriesMessage":
                 RequestMissingEntriesMessage missingEntriesMessage = (RequestMissingEntriesMessage)receivedMessage;
                 await _parentNode.Proposer.InformMissingDecrees(missingEntriesMessage);
@@ -129,6 +118,31 @@ public class Server
             case "InformMissingEntriesMessage":
                 InformMissingEntriesMessage informAboutDecree = (InformMissingEntriesMessage)receivedMessage;
                 await _parentNode.Learner.WriteMissingDecreesToLedger(informAboutDecree._entriesString);
+                break;
+            //TransactionMessages
+            case "TransactionProposal":
+                TransactionProposal transactionProposal = (TransactionProposal)receivedMessage;
+                _parentNode.Proposer.OnTransactionProposal(transactionProposal);
+                break;
+            case "FindLeader":
+                //TODO: 
+                FindLeader findLeader = (FindLeader)receivedMessage;
+                if (findLeader._networkName == _parentNode.network_name)
+                {
+                    Leader leader = new Leader(_parentNode.Client._messageIdCounter,_parentNode.Id, _parentNode.network_name,_parentNode.PresidentNode.Id, _parentNode.PresidentNode.EndPoint)
+                }
+                break;
+            case "Leader":
+                Leader leader = (Leader)receivedMessage;
+                await _parentNode.Proposer.OnLeader(leader);
+                break;
+            case "Transaction":
+                Transaction transaction = (Transaction)receivedMessage;
+                await _parentNode.Proposer.OnTransaction(transaction);
+                break;
+            case "TransactionSuccess":
+                TransactionSuccess transactionSuccess = (TransactionSuccess)receivedMessage;            
+                await _parentNode.Proposer.OnTransactionSuccess(transactionSuccess)
                 break;
             default:
                 Console.WriteLine("Unknown request received.");
@@ -151,7 +165,7 @@ public class Server
         else
         {
             //add data message to the log of recently received message
-            recentlyReceivedMessages.Enqueue(message._id); 
+            recentlyReceivedMessages.Enqueue(message._id);
 
             if (recentlyReceivedMessages.Count() == MAX_LOG_ENTRY_SIZE)
             {

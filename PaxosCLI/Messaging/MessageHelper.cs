@@ -1,7 +1,5 @@
-﻿using System;
+﻿using System.Globalization;
 using System.Text;
-using PaxosCLI.NodeAgents;
-using System.Globalization;
 
 namespace PaxosCLI.Messaging;
 
@@ -145,6 +143,26 @@ public static class MessageHelper
                         return new SuccessBeginBallot(messageId, senderId,
                                                       decreeSS, decreeIdSS,
                                                       ballotIdBB, decreeBB);
+                    }
+                case "TP":
+                    {
+                        return new TransactionProposal(messageIdCounter, senderId, networkName, decree)
+                    }
+                case "FL":
+                    {
+                        return new FindLeader(messageIdCounter, senderId, networkName)
+                    }
+                case "L":
+                    {
+                        return new Leader(messageIdCounter, senderId, )
+                    }
+                case "T":
+                    {
+                        return new Transaction(long messageIdCounter, int senderId, )
+                    }
+                case "TS":
+                    {
+                        return new TransactionSuccess(long messageIdCounter, int senderId, )
                     }
                 default:
                     {
