@@ -9,10 +9,10 @@ namespace PaxosCLI.Database;
 /// To access the local database, the Ledger class will be accessed, 
 /// which is an extention of the DBContext class (from Entity Framework).
 /// </summary>
-public static class LedgerHelper
+public class LedgerHelper
 {
-    public static string _databaseName { get; private set; } = "ledger.db";
-    public static void setDb(string db)
+    public string _databaseName { get; private set; } = "ledger.db";
+    public void setDb(string db)
     {
         _databaseName = db;
     }
@@ -20,7 +20,7 @@ public static class LedgerHelper
     ///   If a newly elected president p has all
     ///   decrees with numbers less than or equal to n written in his ledger, it will return n.
     /// </summary>
-    public static async Task<long> GetLastEntryIdUntilMissingData()
+    public async Task<long> GetLastEntryIdUntilMissingData()
     {
         long previousId = 0;
         List<LedgerEntry> entries = await GetEntries();
@@ -50,7 +50,7 @@ public static class LedgerHelper
     ///   Say, president p has up to decree 2, he will ask for all decrees q has, higher than 2.
     ///   Node q might then send: "3:Hello|4:How are you?" (which is what this method returns)
     /// </summary>
-    public static async Task<string> GetMissingEntriesPresident(int parentNodeId, int requestingNodeId, long decreeId)
+    public async Task<string> GetMissingEntriesPresident(int parentNodeId, int requestingNodeId, long decreeId)
     {
         string missingEntriesString = "";
         List<LedgerEntry> entriesToInformPresident = new List<LedgerEntry>();
@@ -86,7 +86,7 @@ public static class LedgerHelper
     /// </summary>
     /// <param name="hasDecreesUntil">Number until president p is missing decrees</param>
     /// <returns>A string with all missing decree ids</returns>
-    public async static Task<string> GetMissingDecreesString(long hasDecreesUntil)
+    public async Task<string> GetMissingDecreesString(long hasDecreesUntil)
     {
         List<LedgerEntry> writtenEntries = await GetEntries();
         List<int> writtenDecreeIds = writtenEntries.Select(e => (int)e.Id).ToList();
@@ -101,7 +101,7 @@ public static class LedgerHelper
     /// </summary>
     /// <param name="missingDecreeIds">The decree ids which non-president q is missing</param>
     /// <returns>A string of decrees (which non-president is missing), to be sent to non-president q</returns>
-    public static async Task<string> GetMissingEntriesForNonPresident(List<long> missingDecreeIds)
+    public async Task<string> GetMissingEntriesForNonPresident(List<long> missingDecreeIds)
     {
         string missingEntriesString = "";
         List<LedgerEntry> entriesToInform = new List<LedgerEntry>();
@@ -133,7 +133,7 @@ public static class LedgerHelper
     /// Gets all written entries
     /// </summary>
     /// <returns>A list of all written entries</returns>
-    public static async Task<List<LedgerEntry>> GetEntries()
+    public async Task<List<LedgerEntry>> GetEntries()
     {
         using (Ledger ledger = new Ledger(_databaseName))
         {
@@ -146,7 +146,7 @@ public static class LedgerHelper
     /// </summary>
     /// <param name="decreeId">Position in the ledger to check for a value</param>
     /// <returns>Byte array if a value exists for decreeId. Null if there is no value at decreeId</returns>
-    public static async Task<byte[]> GetOutcome(long decreeId)
+    public async Task<byte[]> GetOutcome(long decreeId)
     {
         LedgerEntry outcomeEntry = null;
         using (Ledger ledger = new Ledger(_databaseName))
@@ -168,7 +168,7 @@ public static class LedgerHelper
     /// Saves the Paxos progress valuables
     /// </summary>
     /// <param name="node">The node's values to save (always the node of the local instance)</param>
-    public static async Task SavePaxosProgressAsync(Node node)
+    public async Task SavePaxosProgressAsync(Node node)
     {
         Task task = Task.Factory.StartNew(async () =>
                 {

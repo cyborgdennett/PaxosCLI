@@ -78,6 +78,8 @@ public class Node
 
     //keeping track of time
     public static readonly int MINUTE_IN_PAXOS_TIME = 46; //see thesis why I chose this value (45.45ms)
+    public readonly string dbAddress;
+    public readonly LedgerHelper LedgerHelper;
 
     /// <summary>
     /// !!!REMOVE AFTER USE
@@ -137,8 +139,10 @@ public class Node
         NetworkName = networkName;
 
         GetConnectionInformation();
+        dbAddress = "ledger_" + networkName + "_" + Id.ToString() + ".db";
+        LedgerHelper = new LedgerHelper();
         LedgerHelper.setDb("ledger_" + networkName + "_" + Id.ToString() + ".db");
-        Console.WriteLine(LedgerHelper._databaseName);
+        Console.WriteLine(dbAddress);
 
         PrepareDB(); //DISABLE WHEN NOT NEEDED. SQLite needs this.
 

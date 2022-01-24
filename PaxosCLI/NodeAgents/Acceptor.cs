@@ -24,7 +24,7 @@ public class Acceptor
             Console.WriteLine("[Acceptor] Received new nextballot message.");
             _parentNode.nextBal = nextBallotMsg._ballotId;
             await SendLastVoteMessage(nextBallotMsg);
-            await LedgerHelper.SavePaxosProgressAsync(_parentNode);
+            await _parentNode.LedgerHelper.SavePaxosProgressAsync(_parentNode);
         }
         else if (nextBallotMsg._ballotId < _parentNode.nextBal)
         {
@@ -61,7 +61,7 @@ public class Acceptor
             string missingDecreesPresidentString
                 = nextBallotMsg._senderId == _parentNode.Id
                 ? ""
-                : await LedgerHelper.GetMissingEntriesPresident(_parentNode.Id,
+                : await _parentNode.LedgerHelper.GetMissingEntriesPresident(_parentNode.Id,
                                                                 nextBallotMsg._senderId,
                                                                 nextBallotMsg._hasDecreesUntil);
 
@@ -98,7 +98,7 @@ public class Acceptor
     /// <param name="nextBallotMsg"></param>
     private async Task RequestMissingEntries(NextBallot nextBallotMsg)
     {
-        string missingDecreesString = await LedgerHelper.GetMissingDecreesString(nextBallotMsg._hasDecreesUntil);
+        string missingDecreesString = await _parentNode.LedgerHelper.GetMissingDecreesString(nextBallotMsg._hasDecreesUntil);
         RequestMissingEntriesMessage request = new RequestMissingEntriesMessage(_parentNode.Client._messageIdCounter,
                                                                                 _parentNode.Id,
                                                                                 nextBallotMsg._hasDecreesUntil,
@@ -129,7 +129,7 @@ public class Acceptor
             _parentNode.prevBal = beginBallotMsg._ballotId;
             _parentNode.prevDec = beginBallotMsg._decree;
             await SendVotedMessage(beginBallotMsg);
-            await LedgerHelper.SavePaxosProgressAsync(_parentNode);
+            await _parentNode.LedgerHelper.SavePaxosProgressAsync(_parentNode);
         }
         else if (beginBallotMsg._ballotId < _parentNode.nextBal)
         {

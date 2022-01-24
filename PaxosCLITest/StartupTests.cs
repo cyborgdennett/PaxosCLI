@@ -24,22 +24,6 @@ namespace PaxosCLITest
         {
             try
             {
-                //Create node ip files
-                var stringpath = Directory.GetCurrentDirectory();
-                var nodespath = Path.Combine(stringpath, "Nodes");
-                if (!Directory.Exists(nodespath))
-                {
-                    Directory.CreateDirectory(nodespath);
-                }
-                Thread.Sleep(5);
-            }
-            catch (Exception ex) { }
-        }
-        [TestCleanup()]
-        public void cleanup()
-        {
-            try
-            {
                 //Cleanup all node ip files
                 var stringpath = Directory.GetCurrentDirectory();
                 var nodespath = Path.Combine(stringpath, "Nodes");
@@ -47,8 +31,31 @@ namespace PaxosCLITest
                 {
                     Directory.Delete(nodespath, true);
                 }
+                Directory.CreateDirectory(nodespath);
+                Thread.Sleep(5);
+
+                //Cleanup ledgers
+                var di = new DirectoryInfo(stringpath);
+                List<FileInfo> files = new();
+                foreach (string ext in new List<string>() { ".db", ".db-wal", ".db-shm" })
+                {
+                    files.AddRange(new DirectoryInfo(stringpath).GetFiles("*" + ext).Where(p =>
+                      p.Extension.Equals(ext, StringComparison.CurrentCultureIgnoreCase))
+                      .ToArray());
+                }
+                foreach(FileInfo file in files)
+                {
+                    Console.WriteLine(file.FullName);
+                    File.Delete(file.FullName);
+                }
+
             }
             catch (Exception ex) { }
+        }
+        [TestCleanup()]
+        public void cleanup()
+        {
+
         }
         public void addNodeFile(string network, List<(int, int)> idport)
         {
@@ -57,7 +64,7 @@ namespace PaxosCLITest
             var filepath = Path.Combine(nodespath, network + ".csv");
             if (!System.IO.File.Exists(filepath))
             {
-                File.Create(filepath);
+                File.Create(filepath).Dispose();
             }
             Thread.Sleep(5);
             using (System.IO.FileStream fs = File.OpenWrite(filepath))
@@ -98,7 +105,6 @@ namespace PaxosCLITest
                 this.port = port;
                 this.networkName = network;
             }
-            public void stop() => Thread.Abort();
         }
 
         private IPAddress GetLocalActiveIpAddress()
@@ -126,22 +132,20 @@ namespace PaxosCLITest
         public void TestProgram()
         {
             addNodeFile("testnetwork", new List<(int, int)> { (1, 10000), (2, 10001) });
-            TestNode testNode = new TestNode(10000, "testnetwork");
-            testNode.start();
-            var stringpath = Directory.GetCurrentDirectory();
-            var nodespath = Path.Combine(stringpath, "Nodes/testnetwork.csv");
-            foreach(var line in File.ReadAllLines(nodespath))
-            {
-                Console.WriteLine(line);
-            }
+            addNodeFile("HomeNetwork-0123", new List<(int, int)> { (1, 10002), (2, 10003) });
+            
+            var testNodeList = new List<TestNode>() { new(10000, "testnetwork"),
+                                                        new(10001, "testnetwork"),
+                                                        new(10002, "HomeNetwork-0123"),
+                                                        new(10003, "HomeNetwork-0123")};
+            testNodeList.ForEach(node => node.start());
+            
             
             for (int i = 0; i < 8; i++) {
                 Console.WriteLine("[Test] Initialising... {0}", i);
                 Thread.Sleep(500);
             }
-
             Console.WriteLine("[Test] Wakeup...");
-            //thread.Join(new TimeSpan(0, 0, 2));
             var findleaderbuffer = Encoding.ASCII.GetBytes("1.1,FL,;");
             var leaderbuffer = Encoding.ASCII.GetBytes("1.1,L,FakeNetwork,1;1.1.1.1:10000");
             var transactionbuffer = Encoding.ASCII.GetBytes("1.1,T,FakeNetwork,1;FakeDecree");
@@ -149,7 +153,7 @@ namespace PaxosCLITest
             var transactionProposal = Encoding.ASCII.GetBytes("1.1,TP,FakeNetwork;FakeDecree");
 
             IPEndPoint HomeAddress = new(GetLocalActiveIpAddress(), 10000);
-            IPEndPoint FakeAddress = new(GetLocalActiveIpAddress(), 10001);
+            IPEndPoint FakeAddress = new(GetLocalActiveIpAddress(), 10005);
             UdpClient client = new(FakeAddress);
 
             client.Send(transactionbuffer, transactionbuffer.Length, HomeAddress);
@@ -159,12 +163,43 @@ namespace PaxosCLITest
             client.Send(findleaderbuffer, findleaderbuffer.Length, HomeAddress);
             client.Send(transactionsuccessbuffer, transactionsuccessbuffer.Length, HomeAddress);
 
-            testNode.Node.testinput("", "This is a test 1234 beep boop");
+            //testNode.Node.testinput("", "This is a test 1234 beep boop");
             Thread.Sleep(2000);
 
-            //Assert.IsTrue(true);
-            Console.WriteLine(testNode.Node);
+            Assert.IsTrue(true);
+            
+        }
+        [TestMethod]
+        public void TestSingleMessageDelivery()
+        {
+            addNodeFile("testnetwork", new List<(int, int)> { (1, 10000), (2, 10001) });
+            TestNode testNode = new TestNode(10000, "testnetwork");
+            testNode.start();
+            IPEndPoint HomeAddress = new(GetLocalActiveIpAddress(), 10000);
+            IPEndPoint FakeAddress = new(GetLocalActiveIpAddress(), 10001);
+            UdpClient client = new(FakeAddress);
+
+            for (int i = 0; i < 8; i++)
+            {
+                Console.WriteLine("[Test] Initialising... {0}", i);
+                Thread.Sleep(500);
+            }
+            Console.WriteLine("[Test] Wakeup...");
             Assert.IsTrue(testNode.Node.Id == 1);
+            var findleaderbuffer = Encoding.ASCII.GetBytes("1.1,FL,;");
+            var leaderbuffer = Encoding.ASCII.GetBytes("1.1,L,FakeNetwork,1;1.1.1.1:10000");
+            var transactionbuffer = Encoding.ASCII.GetBytes("1.1,T,FakeNetwork,1;FakeDecree");
+            var transactionsuccessbuffer = Encoding.ASCII.GetBytes("1.1,TS,FakeNetwork,1;");
+            var transactionProposal = Encoding.ASCII.GetBytes("1.1,TP,FakeNetwork;FakeDecree");
+
+            client.Send(transactionbuffer, transactionbuffer.Length, HomeAddress);
+            client.Send(transactionsuccessbuffer, transactionsuccessbuffer.Length, HomeAddress);
+            client.Send(leaderbuffer, leaderbuffer.Length, HomeAddress);
+            client.Send(transactionProposal, transactionProposal.Length, HomeAddress);
+            client.Send(findleaderbuffer, findleaderbuffer.Length, HomeAddress);
+            client.Send(transactionsuccessbuffer, transactionsuccessbuffer.Length, HomeAddress);
+
+            //testNode.Node.testinput("", "This is a test 1234 beep boop");
         }
         [TestMethod]
         public void TestDoubleUdpClient()

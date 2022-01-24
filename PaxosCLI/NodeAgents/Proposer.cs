@@ -270,7 +270,7 @@ public class Proposer
                 }
                 else if (ballotSuccessful == 0 && await Succeed() == 1)
                 {
-                    success = await LedgerHelper.GetOutcome(_parentNode.entryId);
+                    success = await _parentNode.LedgerHelper.GetOutcome(_parentNode.entryId);
                     if (success == null)
                         return;
 
@@ -295,7 +295,7 @@ public class Proposer
     public async Task ExecuteCrossNetwork(decimal decreeId, string network)
     {
         //Check if decree is known
-        byte[] decree = await LedgerHelper.GetOutcome((long)decreeId);
+        byte[] decree = await _parentNode.LedgerHelper.GetOutcome((long)decreeId);
         if(decree == null)
         {
             Console.WriteLine("[Proposer] Transaction Error: Decree unknown");
@@ -428,7 +428,7 @@ public class Proposer
         {
             Console.WriteLine("[Proposer] Sending nextBallotMsg to {0},", String.Join(",", setOfNodes.Keys));
             TimeAtPreviousAction = DateTime.Now;
-            long lastEntryUntilMissing = await LedgerHelper.GetLastEntryIdUntilMissingData();
+            long lastEntryUntilMissing = await _parentNode.LedgerHelper.GetLastEntryIdUntilMissingData();
             NextBallot nextBallot = new NextBallot(_parentNode.Client._messageIdCounter, _parentNode.Id, _parentNode.lastTried, lastEntryUntilMissing);
 
             //send message to peers
@@ -484,7 +484,7 @@ public class Proposer
         //learn about any missing decrees sent by lastvote from other priests
         if (_parentNode.isPresident && _parentNode.prevVotes.Count() >= 1)
         {
-            List<LedgerEntry> entries = await LedgerHelper.GetEntries();
+            List<LedgerEntry> entries = await _parentNode.LedgerHelper.GetEntries();
             HashSet<long> decreesInLedger = new HashSet<long>();
             List<string> missingDecreesStrings =
                 _parentNode.prevVotes.Select(v => v._missingDecrees)
@@ -554,7 +554,7 @@ public class Proposer
             ? rmem._entriesInOwnLedgerString.Split('|').Select(d => long.Parse(d)).ToList()
             : new List<long>();
 
-        string entriesToInformString = await LedgerHelper.GetMissingEntriesForNonPresident(missingDecreeIds);
+        string entriesToInformString = await _parentNode.LedgerHelper.GetMissingEntriesForNonPresident(missingDecreeIds);
         InformMissingEntriesMessage informMissingEntriesMessage =
             new InformMissingEntriesMessage(_parentNode.Client._messageIdCounter,
                                             _parentNode.Id,
@@ -751,7 +751,7 @@ public class Proposer
             .Count() == _parentNode.quorum.Count();
 
 
-        byte[] outcome = await LedgerHelper.GetOutcome(_parentNode.entryId);
+        byte[] outcome = await _parentNode.LedgerHelper.GetOutcome(_parentNode.entryId);
 
         if (_parentNode.status == NodeStatus.polling
             && quorumMembersAreVoters
@@ -801,7 +801,7 @@ public class Proposer
     /// <param name="success">Message containing infromation of the decree to write.</param>
     private async Task SendSuccessMessage(Success success)
     {
-        byte[] outcome = await LedgerHelper.GetOutcome(_parentNode.entryId);
+        byte[] outcome = await _parentNode.LedgerHelper.GetOutcome(_parentNode.entryId);
         if (outcome != null)
         {
             Console.WriteLine("[Proposer] Sending passed decree [{0}:{1}] to learners.", _parentNode.entryId, MessageHelper.ByteArrayToString(outcome));
@@ -950,7 +950,7 @@ public class Proposer
 
         if (_parentNode.isPresident)
         {
-            List<LedgerEntry> entries = await LedgerHelper.GetEntries();
+            List<LedgerEntry> entries = await _parentNode.LedgerHelper.GetEntries();
             List<int> writtenEntryIds = entries.Select(e => (int)e.Id).ToList();
 
             if (writtenEntryIds.Any())
@@ -1026,7 +1026,7 @@ public class Proposer
             _parentNode.lastTried++;
         }
 
-        await LedgerHelper.SavePaxosProgressAsync(_parentNode);
+        await _parentNode.LedgerHelper.SavePaxosProgressAsync(_parentNode);
         Console.WriteLine("[Proposer] Ballot id incremented to: {0}", _parentNode.lastTried);
     }
 }

@@ -363,7 +363,7 @@ public class Server
         if (Math.Truncate(hb._lastTried) > Math.Truncate(_parentNode.lastTried))
         {
             _parentNode.lastTried = MessageHelper.CreateUniqueMessageId((long)Math.Truncate(hb._lastTried), _parentNode.Id);
-            await LedgerHelper.SavePaxosProgressAsync(_parentNode);
+            await _parentNode.LedgerHelper.SavePaxosProgressAsync(_parentNode);
         }
     }
 }
