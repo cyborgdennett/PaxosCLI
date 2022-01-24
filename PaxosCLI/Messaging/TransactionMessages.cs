@@ -6,7 +6,7 @@ namespace PaxosCLI.Messaging;
 /// <summary>
 /// DecreeProposal + network_node
 /// </summary>
- public class TransactionProposal : Message
+public class TransactionProposal : Message
 {
     public string _networkName;
     public byte[] _decree;
@@ -55,7 +55,7 @@ public class Leader : Message
 {
     public string _networkName;
     public int _nodeId;
-    public string _ip;
+    public string _ip;//ip+port
 
     public Leader(long messageIdCounter, int senderId, string networkName, int nodeId, string ip)
     {
@@ -70,7 +70,7 @@ public class Leader : Message
 
     public override byte[] ToByteArray()
     {
-        return MessageHelper.StringToByteArray(String.Format("{0},L,{1};{2},{3}",
+        return MessageHelper.StringToByteArray(String.Format("{0},L,{1},{2};{3}",
                                                                 _id.ToString(CultureInfo.InvariantCulture),
                                                                 _networkName,
                                                                 _nodeId,
@@ -159,6 +159,7 @@ public class BeginTransaction : Message
                                                                 string.Join(",", _sendToIds)));
     }
 }
+
 /// <summary>
 /// Transaction Message, Send this to a node of the other network
 /// </summary>

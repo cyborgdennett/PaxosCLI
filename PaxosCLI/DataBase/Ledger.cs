@@ -12,12 +12,18 @@ public class Ledger : DbContext
     public DbSet<LedgerEntry> Entries { get; set; } //All of the entries, written due to balloting.
     public DbSet<PaxosProgress> Progress { get; set; } //The progress required to be kept track of by the priest. Contains only one record
     public DbSet<NetworkNodeIps> NodeAdresses { get; set; } //Stores the ips.
-
+    private string filename = "ledger.db";
+    public Ledger(string db = "ledger.db")
+    {
+        filename = db;
+        Database.EnsureCreated();
+    }
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         // At the moment the SQLite database provider is used to store data.
         // It can be changed to many kinds of databases. See https://docs.microsoft.com/en-us/ef/core/providers/
-        optionsBuilder.UseSqlite("Data Source=ledger.db");
+        //optionsBuilder.UseSqlite("Data Source=ledger.db");
+        optionsBuilder.UseSqlite("Data Source=" + filename);
     }
 
     /// <summary>
@@ -42,6 +48,7 @@ public class Ledger : DbContext
 /// This class contains the information on which consensus has been reached.
 /// Because it is only a proof of concept, the decision was made to reach agreement over solely a string (Decree).
 /// </summary>
+[Table("LedgerEntry")]
 public class LedgerEntry
 {
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -57,6 +64,7 @@ public class LedgerEntry
 /// <summary>
 /// Contains the important progress information the priest had to keep track of in the parliament.
 /// </summary>
+[Table("PaxosProgress")]
 public class PaxosProgress
 {
     public int Id { get; set; }
@@ -69,6 +77,7 @@ public class PaxosProgress
 /// <summary>
 /// Contains the Ip address of the nodes.
 /// </summary>
+[Table("NetworkNodeIps")]
 public class NetworkNodeIps
 {
     public int Id { get; set; }

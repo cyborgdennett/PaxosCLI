@@ -19,7 +19,7 @@ partial class LedgerModelSnapshot : ModelSnapshot
         modelBuilder
             .HasAnnotation("ProductVersion", "2.1.0-preview2-30571");
 
-        modelBuilder.Entity("PaxosBlockchainSimulation.LedgerEntry", b =>
+        modelBuilder.Entity("PaxosCLI.LedgerEntry", b =>
             {
                 b.Property<long>("Id")
                     .ValueGeneratedOnAdd();
@@ -31,7 +31,7 @@ partial class LedgerModelSnapshot : ModelSnapshot
                 b.ToTable("Entries");
             });
 
-        modelBuilder.Entity("PaxosBlockchainSimulation.PaxosProgress", b =>
+        modelBuilder.Entity("PaxosCLI.PaxosProgress", b =>
             {
                 b.Property<int>("Id")
                     .ValueGeneratedOnAdd();

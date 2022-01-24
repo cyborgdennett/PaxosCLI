@@ -38,6 +38,17 @@ public class Acceptor
 
     }
 
+    public async Task OnReceiveFindLeader(FindLeader findLeaderMsg, Node node)
+    {
+        if(_parentNode.PresidentNode == null) return;
+        Leader leader = new Leader(_parentNode.Client._messageIdCounter,
+                                    _parentNode.Id, 
+                                    _parentNode.network_name,
+                                    _parentNode.PresidentNode.Id, 
+                                    _parentNode.PresidentNode.EndPoint.ToString());
+        await _parentNode.Client.SendMessageToNode(leader, node, false, false);
+    }
+
     /// <summary>
     ///   Informs president p of previously voted for decrees.
     ///   It's a promise of node q to not vote for a ballot with a lower id.

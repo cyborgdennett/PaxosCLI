@@ -18,31 +18,61 @@ public class Proposer
     private Queue<Tuple<string, byte[]>> TransactionProposals;
     private int totalQueeSize = 5;
     private Thread ExecutePaxosOnReceivedProposalThread;
+    private Dictionary<String, Node> NetworkLeaderNodes { get; set; }
+    private List<int> FoundTransactionIds { get; set; }
+    private Queue<Tuple<string, int, byte[], Node>> TransactionQueue;//Received transactions
+    Thread BeginProposingOnInputThread;
 
     public Proposer(Node node)
     {
         _parentNode = node;
         Proposals = new Queue<byte[]>();
+        NetworkLeaderNodes = new();
         TransactionProposals = new Queue<Tuple<string, byte[]>>();
+        TransactionQueue = new Queue<Tuple<string, int, byte[], Node>>();
     }
 
     /// <summary>
-    /// The first string is the network name or empty if none, the second is the decree
+    /// The first string is the network name or empty if not an transaction, the second is the decree
     /// !!!Override this in the Program.cs for the application level
     /// </summary>
     /// <returns></returns>
     public Tuple<string, string> Input()
     {
-        string input = Console.ReadLine();
-        Console.WriteLine(input);
+        string input;
+        if (_parentNode.hasSensor)
+        {
+            input = _parentNode.sensorData.Read().Trim();
+            if (input == "") return null;
+        }
+        else
+        {
+            input = Console.ReadLine();
+        }
+        
         return new Tuple<string, string>("", input);
     }
 
     /// <summary>
+    /// Start listening for input to proposer
+    /// </summary>
+    public void InitBeginProposingOnInput()
+    {
+        BeginProposingOnInputThread = new Thread(async () =>
+        {
+            while (true)
+            {
+                await BeginProposingOnInput();
+            }
+        });
+        BeginProposingOnInputThread.Start();
+    }
+    
+    /// <summary>
     /// Allows for sending proposals from the command line.
     /// If the current node is NOT the president, redirect the proposal to the president
     /// </summary>
-    public async Task BeginProposingOnInput()
+    private async Task BeginProposingOnInput()
     {
 
         Console.WriteLine("[Proposer] Preparing...");
@@ -53,29 +83,36 @@ public class Proposer
             Thread.Sleep(100);
         }
 
-
-        //TODO: create system that can use different inputs
+        //TODO: create system that can use different input functions
         while (_parentNode.Client.IsSending && _parentNode.Server.isListening)
         {
-            Thread.Sleep(1000);
-
-            string input = "";
-            if (!_parentNode.testBool)
+            Thread.Sleep(500);
+            Tuple<string, string> inputtuple = null;
+            if (_parentNode._messages.TryDequeue(out inputtuple))
             {
-                input = _parentNode.sensorData.Read().Trim();
-                if (input == "") continue;
+
             }
             else
             {
-                input = Console.ReadLine();
+                //inputtuple = Input();
             }
+            if(inputtuple == null) continue;
+            
 
-
-            byte[] inputInBytes = MessageHelper.StringToByteArray(input);
+            Console.WriteLine(inputtuple);
+            byte[] inputInBytes = MessageHelper.StringToByteArray(inputtuple.Item2);
 
             if (_parentNode.isPresident)
             {
-                Proposals.Enqueue(inputInBytes);   
+                if (inputtuple.Item1 == "")
+                {
+                    Console.WriteLine("sending to self");
+                    Proposals.Enqueue(inputInBytes);
+                }
+                else
+                {
+                    TransactionProposals.Enqueue(new Tuple<string, byte[]>(inputtuple.Item1, inputInBytes));
+                }
             }
             else if (!_parentNode.isPresident)
             {
@@ -87,12 +124,64 @@ public class Proposer
                         Thread.Sleep(100);
                     }
                 }
+                Message msg;
 
-                //send the proposal to the president                
-                DecreeProposal decreeProposal = new DecreeProposal(_parentNode.Client._messageIdCounter,
+                //send the proposal to the president
+                if (inputtuple.Item1 == "")
+                    msg = new DecreeProposal(_parentNode.Client._messageIdCounter,
                                                                 _parentNode.Id, inputInBytes);
-                await _parentNode.Client.SendMessageToNode(decreeProposal, _parentNode.PresidentNode, true, true);
+                else
+                    msg = new TransactionProposal(_parentNode.Client._messageIdCounter,
+                                                                _parentNode.Id, inputtuple.Item1, inputInBytes);
+                Console.WriteLine(msg);
+                await _parentNode.Client.SendMessageToNode(msg, _parentNode.PresidentNode, true, true);
             }
+        }
+    }
+
+    public async Task ProposeOnInput(Tuple<string, string> inputtuple)
+    {
+        while (!_parentNode.Client.IsSending && !_parentNode.Server.isListening
+                || (_parentNode.isPresident && !presidentInitTaskFinished))
+        {
+            //If the current node is a president, wait for the inital president tasks to be finished
+            Thread.Sleep(100);
+        }
+
+        if (inputtuple == null) return;
+
+        Console.WriteLine(inputtuple.Item1);
+        byte[] inputInBytes = MessageHelper.StringToByteArray(inputtuple.Item2);
+
+        if (_parentNode.isPresident)
+        {
+            if (inputtuple.Item1 == "")
+                Proposals.Enqueue(inputInBytes);
+            else
+            {
+                TransactionProposals.Enqueue(new Tuple<string, byte[]>(inputtuple.Item1, inputInBytes));
+            }
+        }
+        else if (!_parentNode.isPresident)
+        {
+            if (_parentNode.PresidentNode == null)
+            {
+                Console.WriteLine("[Proposer] Waiting for president to be known...");
+                while (_parentNode.PresidentNode == null)
+                {
+                    Thread.Sleep(100);
+                }
+            }
+            Message msg;
+
+            //send the proposal to the president
+            if (inputtuple.Item1 == "")
+                msg = new DecreeProposal(_parentNode.Client._messageIdCounter,
+                                                            _parentNode.Id, inputInBytes);
+            else
+                msg = new TransactionProposal(_parentNode.Client._messageIdCounter,
+                                                            _parentNode.Id, inputtuple.Item1, inputInBytes);
+            await _parentNode.Client.SendMessageToNode(msg, _parentNode.PresidentNode, true, true);
         }
     }
 
@@ -205,6 +294,13 @@ public class Proposer
 
     public async Task ExecuteCrossNetwork(decimal decreeId, string network)
     {
+        //Check if decree is known
+        byte[] decree = await LedgerHelper.GetOutcome((long)decreeId);
+        if(decree == null)
+        {
+            Console.WriteLine("[Proposer] Transaction Error: Decree unknown");
+            return;
+        }
         //if you are at your own networkname, you can stop the procedure and send a success message to the other Leader
         if (_parentNode.NetworkName == network)
         {
@@ -212,30 +308,101 @@ public class Proposer
             return;
         }
         string NETWORK_FILE_PATH = "Nodes/" + network + ".csv";
-        Stack<string> endpoints = new Stack<string>(File.ReadAllLines(NETWORK_FILE_PATH));
+        Stack<string> endpoints;
+        try
+        {
+            endpoints = new Stack<string>(File.ReadAllLines(NETWORK_FILE_PATH));
+        }
+        catch (Exception e) 
+        { 
+            Console.WriteLine("[Proposer] Transaction Error: Network " + NETWORK_FILE_PATH + " not found"); 
+            return; 
+        }
         if (endpoints.Count == 0)
         {
-            Console.WriteLine("[Proposer] Transaction Error: Network " + NETWORK_FILE_PATH + " not found");
+            Console.WriteLine("[Proposer] Transaction Error: Network " + NETWORK_FILE_PATH + " file empty");
             return;
         }
-        int networkSize = endpoints.Count;
-        Random rand = new Random();
-        //create random transactionId
-        int transactionId = rand.Next(0, int.MaxValue);
 
-        //Find Leader
-        FindLeader findLeaderMsg = new FindLeader(_parentNode.Client._messageIdCounter, _parentNode.Id, network);
-        TimeAtPreviousAction = DateTime.Now();
-        while ((DateTime.Now() - TimeAtPreviousAction).TotalSeconds() < 2)
+        //Make an cluster of the csv file
+        Cluster TransactionNodes = new();
+        foreach (String endpoint in endpoints)
         {
-            await LeaderFound();
+
+            string[] endpointPropterties = endpoint.Split(',');
+            int e_id = Int32.Parse(endpointPropterties[0]);
+            System.Net.IPAddress e_ip = System.Net.IPAddress.Parse(endpointPropterties[1]);
+            int e_port = Int32.Parse(endpointPropterties[2]);
+            Node e_node = new Node(e_id, e_ip, e_port);
+
+            TransactionNodes.TryAdd(e_id, e_node);
         }
+
+        Random rand = new();
+        //create random transactionId
+        int transactionId = rand.Next(0, int.MaxValue); 
+
+        NetworkLeaderNodes.Remove(network);
+        //make "Find Leader"-message and send to the cluster
+        FindLeader findLeaderMsg = new(_parentNode.Client._messageIdCounter, _parentNode.Id, network);
+        await _parentNode.Client.SendMessageToCluster(findLeaderMsg,TransactionNodes,false);
+        DateTime t = DateTime.Now;
+        bool found = false;
+        while ((DateTime.Now - t).TotalSeconds < 2.0)
+        {
+            if (NetworkLeaderNodes.ContainsKey(network))
+            {
+                found = true;
+
+                Transaction transactionMsg = new(_parentNode.Client._messageIdCounter, _parentNode.Id, network, transactionId, decree);
+                await _parentNode.Client.SendMessageToNode(transactionMsg, NetworkLeaderNodes[network], false, false);
+            }
+        }
+        if (!found)
+        {
+            Console.WriteLine("[Proposer] Transaction Error: FindLeader timeout");
+            return;
+        }
+        t = DateTime.Now;
+        found = false;
+        while ((DateTime.Now - t).TotalSeconds < 2.0)
+        {
+            if (FoundTransactionIds.Contains(transactionId))
+            {
+                Console.WriteLine("[Proposer] Transaction [{0]] complete",transactionId);
+            }
+        }     
+        if (!found)
+        {
+            Console.WriteLine("[Proposer] Transaction Error: TransactionSuccess timeout");
+            return;
+        }
+    }
+
+    public async Task OnLeader(Leader leader)
+    {
+        try
+        {
+            System.Net.IPAddress ip = System.Net.IPAddress.Parse(leader._ip.Substring(0, leader._ip.IndexOf(':')));
+            int port = int.Parse(leader._ip.Substring(leader._ip.IndexOf(':')+1));   
+            Node leaderNode = new Node(leader._nodeId, ip, port);
+            NetworkLeaderNodes[leader._networkName] = leaderNode;
+            Console.WriteLine("[Proposer] added node [{0}] as leader of network [{1}]",leader._nodeId, leader._networkName);
+        } 
+        catch (Exception ex) { Console.WriteLine("[Proposer] received invalid IP");}
 
     }
 
-    public async Task<int> LeaderFound()
+    public async Task OnTransactionSuccess(TransactionSuccess message)
     {
-        
+        FoundTransactionIds.Append(message._transactionId);
+        Console.WriteLine("[Proposer] Received FoundTransaction message");
+    }
+
+    public async Task OnTransaction(Transaction transaction, Node node) 
+    { 
+        TransactionQueue.Enqueue(new Tuple<string, int, byte[], Node>(transaction._networkName, transaction._transactionId, transaction._decree, node));
+        Console.WriteLine("[Proposer] Received transaction message");
     }
 
     public async Task<int> TryNewBallot()
@@ -714,7 +881,7 @@ public class Proposer
                     while (presidentInitTaskFinished)
                     {
 
-                        //This part is for transactions
+                        //This part is for transactions proposals from own to other networks
                         if (TransactionProposals.Count() > 0
                             && _parentNode.status == NodeStatus.idle
                             && GetOnlineNodes().HasMajorityOf(_parentNode.AllNodes))
@@ -726,13 +893,31 @@ public class Proposer
                             //Check if the ballot is passed and written in the ledger
                             if (_parentNode.prevDec == toBallot.Item2)
                             {
-                                Console.WriteLine("Transaction has been written in ledger");
-                                //now find the id of the just executed ballot
+                                Console.WriteLine("Transaction has been written in ledger, sending to [{0}]",toBallot.Item1);
+                                //send the transaction to the other network
                                 await ExecuteCrossNetwork(_parentNode.prevBal, toBallot.Item1);
-                                break;
                             }
 
                         }
+
+                        //This part is for received Transactions from other networks
+                        if(TransactionQueue.Count() > 0
+                            && _parentNode.status == NodeStatus.idle
+                            && GetOnlineNodes().HasMajorityOf(_parentNode.AllNodes))
+                        {
+                            Tuple<string, int, byte[], Node> toBallot = TransactionQueue.Dequeue();
+                            await ExecutePaxos(toBallot.Item3, false, true, 0);
+
+                            //Check if the ballot is passed and written in the ledger
+                            if (_parentNode.prevDec == toBallot.Item3)
+                            {
+                                Console.WriteLine("Transaction [{0}] from network [{1}] has been written in the ledger", toBallot.Item2, toBallot.Item1);
+                                //Give notice to sender network
+                                TransactionSuccess message = new(_parentNode.Client._messageIdCounter, _parentNode.Id, toBallot.Item1,toBallot.Item2);
+                                await _parentNode.Client.SendMessageToNode(message, toBallot.Item4, false, false);
+                            }
+                        }
+
 
                         //This part is for Decrees
                         if (Proposals.Count() > 0
@@ -814,42 +999,6 @@ public class Proposer
         //                   _parentNode.isFill,
         //                   _parentNode.isNewDecree,
         //                   _parentNode.entryId);
-    }
-
-    /// <summary>
-    /// Add a decree to a collection of decrees which need to be added to the distributed ledger.
-    /// Whenever the Proposer && president are inactive and has a decree in this collection, Paxos
-    /// will be executed for this decree.
-    /// </summary>
-    /// <param name="decreeProposal"></param>
-    private async Task<int> SendBeginTransaction()
-    {
-        if (_parentNode.status == NodeStatus.polling && _parentNode.isPresident)
-        {
-            TimeAtPreviousAction = DateTime.Now;
-            BeginTransaction beginTransactionMsg = new BeginTransaction(_parentNode.Client._messageIdCounter, _parentNode.senderId, _parentNode.network_name,
-                                                                        _parentNode.transactionID, _parentNode.decreeID, _parentNode.sendToIds);
-            await _parentNode.Client.SendMessageToCluster(beginTransactionMsg, _parentNode.quorum.GetClusterExcludingNode(_parentNode), true);
-
-            //send this message to own acceptor
-            //devide all the external ID's over the acceptors
-            await _parentNode.Acceptor.OnReceiveBeginTransaction(beginTransactionMsg);
-
-            while (_parentNode.voters.Count() < _parentNode.quorum.Count())
-            {
-                //wait for every quorum member to reply
-                if ((DateTime.Now - TimeAtPreviousAction).TotalMilliseconds >= Node.MINUTE_IN_PAXOS_TIME * 22)
-                {
-                    return 1;
-                }
-            }
-            return 0;
-        }
-        else
-        {
-            Console.WriteLine("[Proposer] Cannot send beginballot message, because not polling.");
-        }
-        return 1;
     }
 
     public void OnDecreeProposal(DecreeProposal decreeProposal)

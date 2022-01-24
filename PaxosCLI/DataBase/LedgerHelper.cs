@@ -11,7 +11,11 @@ namespace PaxosCLI.Database;
 /// </summary>
 public static class LedgerHelper
 {
-
+    public static string _databaseName { get; private set; } = "ledger.db";
+    public static void setDb(string db)
+    {
+        _databaseName = db;
+    }
     /// <summary>
     ///   If a newly elected president p has all
     ///   decrees with numbers less than or equal to n written in his ledger, it will return n.
@@ -51,7 +55,7 @@ public static class LedgerHelper
         string missingEntriesString = "";
         List<LedgerEntry> entriesToInformPresident = new List<LedgerEntry>();
 
-        using (Ledger ledger = new Ledger())
+        using (Ledger ledger = new Ledger(_databaseName))
         {
             entriesToInformPresident = await
                 ledger.Entries
@@ -102,7 +106,7 @@ public static class LedgerHelper
         string missingEntriesString = "";
         List<LedgerEntry> entriesToInform = new List<LedgerEntry>();
 
-        using (Ledger ledger = new Ledger())
+        using (Ledger ledger = new Ledger(_databaseName))
         {
             entriesToInform = await ledger.Entries
                 .Where(en => missingDecreeIds.Contains(en.Id))
@@ -131,7 +135,7 @@ public static class LedgerHelper
     /// <returns>A list of all written entries</returns>
     public static async Task<List<LedgerEntry>> GetEntries()
     {
-        using (Ledger ledger = new Ledger())
+        using (Ledger ledger = new Ledger(_databaseName))
         {
             return await ledger.Entries.ToListAsync();
         }
@@ -145,7 +149,7 @@ public static class LedgerHelper
     public static async Task<byte[]> GetOutcome(long decreeId)
     {
         LedgerEntry outcomeEntry = null;
-        using (Ledger ledger = new Ledger())
+        using (Ledger ledger = new Ledger(_databaseName))
         {
             outcomeEntry = await ledger.Entries.FindAsync(decreeId);
         }
@@ -168,7 +172,7 @@ public static class LedgerHelper
     {
         Task task = Task.Factory.StartNew(async () =>
                 {
-                    using (Ledger ledger = new Ledger())
+                    using (Ledger ledger = new Ledger(_databaseName))
                     {
                         PaxosProgress progress = await ledger.Progress.SingleAsync();
                         progress.LastTried = node.lastTried;

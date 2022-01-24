@@ -52,101 +52,128 @@ public class Server
     /// Based on this information, appropiate behaviour is chosen.
     /// </summary>
     /// <param name="request">The received request</param>
-    private async Task ReceiveRequest(byte[] request)
+    private async Task ReceiveRequest(byte[] request, IPEndPoint ip) 
     {
         Message receivedMessage = MessageHelper.ByteArrayToMessage(request);
         Node sender = _parentNode.Peers.GetNodeById(receivedMessage._senderId);
-        UpdateOnlineStatus(sender);
+        if (!(sender.IPAddress.Equals("127.0.0.1") && sender.Id.Equals(Int32.MinValue))) { //check if sender is a known Node
 
-        if (receivedMessage._doResend && !receivedMessage.GetType().Name.Equals("ArrivalConfirmationMessage"))
-        {
-            await _parentNode.Client.SendArrivalConfirmation(receivedMessage);
-            bool receivedMsgBefore = ReceivedMessageBefore(receivedMessage);
-            if (receivedMsgBefore) return; //if received the message before: do nothing
+            UpdateOnlineStatus(sender);
+
+            if (receivedMessage._doResend && !receivedMessage.GetType().Name.Equals("ArrivalConfirmationMessage"))
+            {
+                await _parentNode.Client.SendArrivalConfirmation(receivedMessage);
+                bool receivedMsgBefore = ReceivedMessageBefore(receivedMessage);
+                if (receivedMsgBefore) return; //if received the message before: do nothing
+            }
+
+            switch (receivedMessage.GetType().Name)
+            {
+                case "ArrivalConfirmationMessage":
+                    ArrivalConfirmationMessage arrivalConfirmationMessage = (ArrivalConfirmationMessage)receivedMessage;
+                    _parentNode.Client.ConfirmArrival(arrivalConfirmationMessage);
+                    break;
+                case "Heartbeat":
+                    Heartbeat hb = (Heartbeat)receivedMessage;
+                    Node receivedFromNode = _parentNode.Peers.GetNodeById(hb._senderId);
+                    await OnHeartbeat(hb);
+                    break;
+                case "NextBallot":
+                    NextBallot nextBallotMsg = (NextBallot)receivedMessage;
+                    await _parentNode.Acceptor.OnReceiveNextBallot(nextBallotMsg);
+                    break;
+                case "LastVote":
+                    LastVote lastVote = (LastVote)receivedMessage;
+                    _parentNode.Proposer.ReceiveLastVoteMessage(lastVote);
+                    break;
+                case "SuccessBeginBallot":
+                    //TODO: not finished!!!
+                    Console.WriteLine("Received SuccessBeginBallot message");
+                    SuccessBeginBallot successBeginBallotMsg = (SuccessBeginBallot)receivedMessage;
+                    await _parentNode.Acceptor.OnReceiveSuccessBeginBallot(successBeginBallotMsg);
+                    break;
+                case "BeginBallot":
+                    BeginBallot beginBallot = (BeginBallot)receivedMessage;
+                    await _parentNode.Acceptor.OnReceiveBeginBallot(beginBallot);
+                    break;
+                case "Voted":
+                    Voted voted = (Voted)receivedMessage;
+                    _parentNode.Proposer.ReceiveVotedMessage(voted);
+                    break;
+                case "Success":
+                    Success success = (Success)receivedMessage;
+                    await _parentNode.Learner.ReceiveSuccess(success);
+                    break;
+                case "UpdateBallotNumber":
+                    UpdateBallotNumber newBallot = (UpdateBallotNumber)receivedMessage;
+                    await _parentNode.Proposer.ReceiveNewerBallotNumber(newBallot._nextBal);
+                    break;
+                case "DecreeProposal":
+                    DecreeProposal decreeProposal = (DecreeProposal)receivedMessage;
+                    Console.WriteLine("Received a new decree proposal for [{0}]", MessageHelper.ByteArrayToString(decreeProposal._decree));
+                    _parentNode.Proposer.OnDecreeProposal(decreeProposal);
+                    break;
+                case "RequestMissingEntriesMessage":
+                    RequestMissingEntriesMessage missingEntriesMessage = (RequestMissingEntriesMessage)receivedMessage;
+                    await _parentNode.Proposer.InformMissingDecrees(missingEntriesMessage);
+                    break;
+                case "InformMissingEntriesMessage":
+                    InformMissingEntriesMessage informAboutDecree = (InformMissingEntriesMessage)receivedMessage;
+                    await _parentNode.Learner.WriteMissingDecreesToLedger(informAboutDecree._entriesString);
+                    break;
+
+                //TransactionMessages
+                case "TransactionProposal": //Notice this can only be received if the sender is in current network
+                    TransactionProposal transactionProposal = (TransactionProposal)receivedMessage;
+                    _parentNode.Proposer.OnTransactionProposal(transactionProposal);
+                    break;
+                case "FindLeader":
+                    //TODO: 
+                    FindLeader findLeader = (FindLeader)receivedMessage;
+                    await _parentNode.Acceptor.OnReceiveFindLeader(findLeader, sender);
+                    break;
+                case "Leader":
+                    Leader leader = (Leader)receivedMessage;
+                    await _parentNode.Proposer.OnLeader(leader);
+                    break;
+                case "Transaction":
+                    Transaction transaction = (Transaction)receivedMessage;
+                    await _parentNode.Proposer.OnTransaction(transaction, sender);
+                    break;
+                case "TransactionSuccess":
+                    TransactionSuccess transactionSuccess = (TransactionSuccess)receivedMessage;            
+                    await _parentNode.Proposer.OnTransactionSuccess(transactionSuccess);
+                    break;
+                default:
+                    Console.WriteLine("Unknown request received.");
+                    break;
+            }
         }
-
-        switch (receivedMessage.GetType().Name)
+        else //If sender is not known in the network, it can only be other network-nodes trying to send a transaction
         {
-            case "ArrivalConfirmationMessage":
-                ArrivalConfirmationMessage arrivalConfirmationMessage = (ArrivalConfirmationMessage)receivedMessage;
-                _parentNode.Client.ConfirmArrival(arrivalConfirmationMessage);
-                break;
-            case "Heartbeat":
-                Heartbeat hb = (Heartbeat)receivedMessage;
-                Node receivedFromNode = _parentNode.Peers.GetNodeById(hb._senderId);
-                await OnHeartbeat(hb);
-                break;
-            case "NextBallot":
-                NextBallot nextBallotMsg = (NextBallot)receivedMessage;
-                await _parentNode.Acceptor.OnReceiveNextBallot(nextBallotMsg);
-                break;
-            case "LastVote":
-                LastVote lastVote = (LastVote)receivedMessage;
-                _parentNode.Proposer.ReceiveLastVoteMessage(lastVote);
-                break;
-            case "SuccessBeginBallot":
-                //TODO: not finished!!!
-                Console.WriteLine("Received SuccessBeginBallot message");
-                SuccessBeginBallot successBeginBallotMsg = (SuccessBeginBallot)receivedMessage;
-                await _parentNode.Acceptor.OnReceiveSuccessBeginBallot(successBeginBallotMsg);
-                break;
-            case "BeginBallot":
-                BeginBallot beginBallot = (BeginBallot)receivedMessage;
-                await _parentNode.Acceptor.OnReceiveBeginBallot(beginBallot);
-                break;
-            case "Voted":
-                Voted voted = (Voted)receivedMessage;
-                _parentNode.Proposer.ReceiveVotedMessage(voted);
-                break;
-            case "Success":
-                Success success = (Success)receivedMessage;
-                await _parentNode.Learner.ReceiveSuccess(success);
-                break;
-            case "UpdateBallotNumber":
-                UpdateBallotNumber newBallot = (UpdateBallotNumber)receivedMessage;
-                await _parentNode.Proposer.ReceiveNewerBallotNumber(newBallot._nextBal);
-                break;
-            case "DecreeProposal":
-                DecreeProposal decreeProposal = (DecreeProposal)receivedMessage;
-                Console.WriteLine("Received a new decree proposal for [{0}]", MessageHelper.ByteArrayToString(decreeProposal._decree));
-                _parentNode.Proposer.OnDecreeProposal(decreeProposal);
-                break
-            case "RequestMissingEntriesMessage":
-                RequestMissingEntriesMessage missingEntriesMessage = (RequestMissingEntriesMessage)receivedMessage;
-                await _parentNode.Proposer.InformMissingDecrees(missingEntriesMessage);
-                break;
-            case "InformMissingEntriesMessage":
-                InformMissingEntriesMessage informAboutDecree = (InformMissingEntriesMessage)receivedMessage;
-                await _parentNode.Learner.WriteMissingDecreesToLedger(informAboutDecree._entriesString);
-                break;
-            //TransactionMessages
-            case "TransactionProposal":
-                TransactionProposal transactionProposal = (TransactionProposal)receivedMessage;
-                _parentNode.Proposer.OnTransactionProposal(transactionProposal);
-                break;
-            case "FindLeader":
-                //TODO: 
-                FindLeader findLeader = (FindLeader)receivedMessage;
-                if (findLeader._networkName == _parentNode.network_name)
-                {
-                    Leader leader = new Leader(_parentNode.Client._messageIdCounter,_parentNode.Id, _parentNode.network_name,_parentNode.PresidentNode.Id, _parentNode.PresidentNode.EndPoint)
-                }
-                break;
-            case "Leader":
-                Leader leader = (Leader)receivedMessage;
-                await _parentNode.Proposer.OnLeader(leader);
-                break;
-            case "Transaction":
-                Transaction transaction = (Transaction)receivedMessage;
-                await _parentNode.Proposer.OnTransaction(transaction);
-                break;
-            case "TransactionSuccess":
-                TransactionSuccess transactionSuccess = (TransactionSuccess)receivedMessage;            
-                await _parentNode.Proposer.OnTransactionSuccess(transactionSuccess)
-                break;
-            default:
-                Console.WriteLine("Unknown request received.");
-                break;
+            switch (receivedMessage.GetType().Name)
+            {
+                //TransactionMessages
+                case "FindLeader":
+                    FindLeader findLeader = (FindLeader)receivedMessage;
+                    await _parentNode.Acceptor.OnReceiveFindLeader(findLeader, sender);
+                    break;
+                case "Leader":
+                    Leader leader = (Leader)receivedMessage;
+                    await _parentNode.Proposer.OnLeader(leader);
+                    break;
+                case "Transaction":
+                    Transaction transaction = (Transaction)receivedMessage;
+                    await _parentNode.Proposer.OnTransaction(transaction, sender);
+                    break;
+                case "TransactionSuccess":
+                    TransactionSuccess transactionSuccess = (TransactionSuccess)receivedMessage;            
+                    await _parentNode.Proposer.OnTransactionSuccess(transactionSuccess);
+                    break;
+                default:
+                    Console.WriteLine("Unknown request received.");
+                    break;
+            }
         }
     }
 
@@ -183,6 +210,12 @@ public class Server
         {
             //Wait for potential new president
         }
+        //added for 'An existing connection was forcibly closed by the remote host'-error. 
+        uint IOC_IN = 0x80000000;
+        uint IOC_VENDOR = 0x18000000;
+        uint SIO_UDP_CONNRESET = IOC_IN | IOC_VENDOR | 12;
+        listener.Client.IOControl((int)SIO_UDP_CONNRESET, new byte[] { Convert.ToByte(false) }, null);
+
         listener.BeginReceive(new AsyncCallback(ReceiveMessageAsync), null);
         isListening = true;
         Console.WriteLine("[Server] Listening.");
@@ -196,7 +229,7 @@ public class Server
         IPEndPoint remoteIpEndPoint = new IPEndPoint(IPAddress.Any, 0);
         byte[] request = listener.EndReceive(result, ref remoteIpEndPoint);
         listener.BeginReceive(new AsyncCallback(ReceiveMessageAsync), null);
-        Task.Factory.StartNew(async () => await ReceiveRequest(request));
+        Task.Factory.StartNew(async () => await ReceiveRequest(request, remoteIpEndPoint));
     }
 
     /// <summary>

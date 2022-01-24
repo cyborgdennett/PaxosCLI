@@ -41,6 +41,7 @@ public class Client
         InitMessageArrivalCheckThread();
     }
 
+
     /// <summary>
     /// Sends a single message to a node
     /// </summary>

@@ -147,7 +147,7 @@ public static class MessageHelper
                 case "TP":
                     {
                         string networkName = messageInformation[2];
-                        byte[] decree = StringToByteArray(messageContent[1]);
+                        byte[] decree = StringToByteArray(messageContent[0]);
                         return new TransactionProposal(messageId, senderId, networkName, decree);
                     }
                 case "FL":
@@ -158,20 +158,20 @@ public static class MessageHelper
                 case "L":
                     {
                         string networkName = messageInformation[2];
-                        int Ip = messageInformation[3]
-                        string Ip = messageInformation[4]
+                        int Id = Int16.Parse(messageInformation[3]);
+                        string Ip = messageContent[0];
                         return new Leader(messageId, senderId, networkName, Id, Ip);
                     }
                 case "T":
                     {
                         string networkName = messageInformation[2];
-                        byte[] decree = StringToByteArray(messageContent[1]);
-                        string transactionId = messageInformation[3]
+                        byte[] decree = StringToByteArray(messageContent[0]);
+                        int transactionId = Int16.Parse(messageInformation[3]);
                         return new Transaction(messageId, senderId, networkName, transactionId, decree);
                     }
                 case "TS":
                     {                       
-                        string transactionId = messageInformation[3]
+                        int transactionId = Int16.Parse(messageInformation[3]);
                         string networkName = messageInformation[2];
                         return new TransactionSuccess(messageId, senderId, networkName, transactionId);
                     }

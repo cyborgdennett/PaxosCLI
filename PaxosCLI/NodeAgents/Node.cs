@@ -3,6 +3,7 @@ using PaxosCLI.ClientServer;
 using PaxosCLI.Database;
 using PaxosCLI.Messaging;
 using PaxosCLI.SensorData;
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
@@ -46,9 +47,10 @@ public class Node
     public Acceptor Acceptor { get; private set; }
     public Learner Learner { get; private set; }
     public Node PresidentNode;
-    public PortChat sensorData { get; set; }
-    public Boolean testBool { get; set; }
 
+    //sensor variables
+    public PortChat sensorData { get; set; }
+    public bool hasSensor = false;
 
     //ledger (solid) variables
     public decimal lastTried;
@@ -78,6 +80,21 @@ public class Node
     public static readonly int MINUTE_IN_PAXOS_TIME = 46; //see thesis why I chose this value (45.45ms)
 
     /// <summary>
+    /// !!!REMOVE AFTER USE
+    /// </summary>
+    /// <param name="input"></param>
+    public ConcurrentQueue<Tuple<string, string>> _messages = new ConcurrentQueue<Tuple<string,string>>();
+    public SemaphoreSlim _messagesAvailable = new SemaphoreSlim(0);
+    public void testinput(string network, string input)
+    {
+        Tuple<string, string> testvalues = new Tuple<string, string>(network,input);
+        Console.WriteLine("testinput");
+
+        _messages.Enqueue(testvalues);
+    }
+    
+
+    /// <summary>
     /// Node construtor for external nodes.
     /// That is, nodes which are not these. These will store connectivity information and other exceptionalities.
     /// </summary>
@@ -97,8 +114,9 @@ public class Node
     /// <summary>
     ///  Constructor for without arduino
     /// </summary>
-    public Node()
+    /*public Node(int port = 10000)
     {
+        PortNumber = port;
         PrepareDB(); //DISABLE WHEN NOT NEEDED. SQLite needs this.
         GetConnectionInformation();
         if (canExecute)
@@ -107,17 +125,24 @@ public class Node
             GetLedgerVariables();
             ConnectToNetwork().Wait();
         }
-    }
+    }*/
 
     /// <summary>
     /// Constructor to start the own Node with the name of its own network.
     /// </summary>
     /// <param name="networkName"></param>
-    public Node(string networkName)
+    public Node(string networkName = "", int port = 10000)
     {
-        PrepareDB(); //DISABLE WHEN NOT NEEDED. SQLite needs this.
+        PortNumber = port;
         NetworkName = networkName;
+
         GetConnectionInformation();
+        LedgerHelper.setDb("ledger_" + networkName + "_" + Id.ToString() + ".db");
+        Console.WriteLine(LedgerHelper._databaseName);
+
+        PrepareDB(); //DISABLE WHEN NOT NEEDED. SQLite needs this.
+
+        //GetConnectionInformation();
         if (canExecute)
         {
             InitRoles();
@@ -131,7 +156,7 @@ public class Node
     /// </summary>
     public Node(PortChat a, Boolean test)
     {
-        testBool = test;
+        hasSensor = test;
         sensorData = a;
         PrepareDB(); //DISABLE WHEN NOT NEEDED. SQLite needs this.
         GetConnectionInformation();
@@ -149,9 +174,9 @@ public class Node
     /// </summary>
     private void PrepareDB()
     {
-        Console.WriteLine("Preparing DB.");
+        Console.WriteLine("Preparing DB. {0}", LedgerHelper._databaseName);
 
-        using (Ledger ledger = new Ledger())
+        using (Ledger ledger = new Ledger(LedgerHelper._databaseName))
         {
             Console.WriteLine("Connecting with DB.");
             var connection = ledger.Database.GetDbConnection();
@@ -201,19 +226,19 @@ public class Node
 
                 foreach (string endpoint in endpoints)
                 {
+                    
                     if (!skippedFirst)
                     {
                         skippedFirst = true;
                         continue;
                     }
-
                     string[] endpointPropterties = endpoint.Split(',');
                     int e_id = Int32.Parse(endpointPropterties[0]);
                     IPAddress e_ip = IPAddress.Parse(endpointPropterties[1]);
                     int e_port = Int32.Parse(endpointPropterties[2]);
                     Node e_node = new Node(e_id, e_ip, e_port);
 
-                    if (e_ip.ToString() == IPAddress.ToString() && !foundSelf)
+                    if (e_ip.ToString() == IPAddress.ToString() && e_port == PortNumber && !foundSelf)
                     {
                         bool e_portInUse = CheckPortInUse(e_port);
                         if (!e_portInUse)
@@ -299,7 +324,8 @@ public class Node
     {
         Client = new Client(this);
         Server = new Server(this);
-        await Proposer.BeginProposingOnInput();
+        Proposer.InitBeginProposingOnInput();
+        //await Proposer.BeginProposingOnInput();
     }
 
     /// <summary>
@@ -342,8 +368,8 @@ public class Node
     public void GetLedgerVariables()
     {
         List<LedgerEntry> entries = new List<LedgerEntry>();
-
-        using (Ledger ledger = new Ledger())
+        Console.WriteLine("Getting ledgervariables from network: " + LedgerHelper._databaseName);
+        using (Ledger ledger = new Ledger(LedgerHelper._databaseName))
         {
             lastTried = ledger.Progress.First().LastTried;
             prevBal = ledger.Progress.First().PrevBal;
