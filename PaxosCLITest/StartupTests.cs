@@ -193,7 +193,7 @@ namespace PaxosCLITest
         /// In the test, we will check if everybody has the decree in their ledger.
         /// </summary>
         [TestMethod]
-        public void TestTransactionDecree1()
+        public void TestTransactionDecree()
         {
             addNodeFile("testnetwork", new List<(int, int)> { (1, 10000), (2, 10001) });
             addNodeFile("HomeNetwork-0123", new List<(int, int)> { (1, 10002), (2, 10003) });
@@ -215,36 +215,25 @@ namespace PaxosCLITest
             if (testNodeList.Exists(x => x.Node.PortNumber == 10001))
                 testNodeList[1].Node.testinput("HomeNetwork-0123", "Transaction Testing...");
             Console.WriteLine("[Test] Wakeup...");
-            for (int i = 0; i < 8; i++)
+            for (int i = 9; i < 13; i++)
             {
                 Console.WriteLine("[Test] Initialising... {0}", i);
                 Thread.Sleep(500);
             }
-            //Thread.Sleep(5000);//
             
             Thread t = new Thread(async () =>
             {
                 List < List < PaxosCLI.Database.LedgerEntry >> ledgerentries = new();
-                testNodeList.ForEach(node => Console.WriteLine(node.Node.LedgerHelper._databaseName));
-                foreach(var (node, index) in testNodeList.Select((value, i) => (value, i)))
+                foreach(var node in testNodeList)
                 {
-                    Console.WriteLine(node.Node.LedgerHelper._databaseName);
                     ledgerentries.Add(await node.Node.LedgerHelper.GetEntries());
-                    foreach (var entry in ledgerentries[index])
-                    {
-                        Console.WriteLine(entry.ToString());
-                    }
                 }
+                
                 //check if whole list is the same
                 Assert.IsTrue(ledgerentries.Any(o => o != ledgerentries[0]) , "Ledgers do not have same contents");
-
             });
-            t.Start();
+            t.Start();       
             t.Join();
-            
-            Assert.IsTrue(true);
-
-
         }
         [TestMethod]
         public void TestSingleMessageDelivery()
