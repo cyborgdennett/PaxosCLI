@@ -129,7 +129,7 @@ public class Learner
         if (ledger == null)
         {
             doSave = true;
-            ledger = new Ledger();
+            ledger = new Ledger(_parentNode.LedgerHelper._databaseName);
         }
 
         LedgerEntry entryInDb = await ledger.Entries.SingleOrDefaultAsync(e => e.Id == entryToWrite.Id);

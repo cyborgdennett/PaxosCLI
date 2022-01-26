@@ -112,6 +112,15 @@ public class Node
         IsOnline = false;
         LastMessageReceivedAt = DateTime.MinValue;
     }
+    public Node(IPEndPoint ip)
+    {
+        Id = 0;
+        IPAddress = ip.Address;
+        PortNumber = ip.Port;
+        EndPoint = ip;
+        IsOnline = false;
+        LastMessageReceivedAt = DateTime.MinValue;
+    }
 
     /// <summary>
     ///  Constructor for without arduino
@@ -218,6 +227,7 @@ public class Node
                 Console.WriteLine(NODES_FILE_PATH);
 
                 string[] endpoints = File.ReadAllLines(NODES_FILE_PATH);
+                
                 bool foundSelf = false;
                 bool skippedFirst = false;
 
@@ -247,15 +257,15 @@ public class Node
                         bool e_portInUse = CheckPortInUse(e_port);
                         if (!e_portInUse)
                         {
-                            Console.WriteLine("Found self in list of endpoints.");
                             foundSelf = true;
                             Id = e_id;
                             IPAddress = e_ip;
                             PortNumber = e_port;
                             EndPoint = new IPEndPoint(e_ip, e_port);
                             IsOnline = true;
-                            Socket = new UdpClient(EndPoint);
-                            Console.WriteLine(ToString());
+                            Socket = new UdpClient(); 
+                            Socket.Client.Bind(EndPoint);
+                            Console.WriteLine("Found self in list of endpoints. {0}", EndPoint);
                             continue;
                         }
                         else

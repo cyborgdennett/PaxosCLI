@@ -38,7 +38,17 @@ public class Cluster : ConcurrentDictionary<int, Node>
         }
         Console.WriteLine("================================================");
     }
-
+    public Node GetNodeByIp(IPEndPoint ip)
+    {
+        foreach(Node n in this.Values)
+        {
+            if(n.EndPoint.ToString() == ip.ToString())
+            {
+                return n;
+            }
+        }
+        return new Node(Int32.MinValue, IPAddress.Parse("127.0.0.1"), 0); //No such node exists
+    }
     public Node GetNodeById(int id)
     {
         if (ContainsKey(id))

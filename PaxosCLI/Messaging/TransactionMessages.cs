@@ -26,7 +26,7 @@ public class TransactionProposal : Message
         return MessageHelper.StringToByteArray(String.Format("{0},TP,{1};{2}",
                                                                 _id.ToString(CultureInfo.InvariantCulture),
                                                                 _networkName,
-                                                                _decree));
+                                                                MessageHelper.ByteArrayToString(_decree)));
     }
 }
 
@@ -101,7 +101,7 @@ public class Transaction : Message
                                                                 _id.ToString(CultureInfo.InvariantCulture),
                                                                 _networkName,
                                                                 _transactionId,
-                                                                _decree));
+                                                                MessageHelper.ByteArrayToString(_decree)));
     }
 
 }

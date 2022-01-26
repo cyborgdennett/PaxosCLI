@@ -33,20 +33,16 @@ public class Acceptor
         }
     }
 
-    public async Task OnReceiveTransaction(Transaction transactionMsg)
-    {
-
-    }
-
     public async Task OnReceiveFindLeader(FindLeader findLeaderMsg, Node node)
     {
-        if(_parentNode.PresidentNode == null) return;
+        if (_parentNode.PresidentNode == null || findLeaderMsg._networkName != _parentNode.NetworkName) return;
         Leader leader = new Leader(_parentNode.Client._messageIdCounter,
                                     _parentNode.Id, 
-                                    _parentNode.network_name,
+                                    _parentNode.NetworkName,
                                     _parentNode.PresidentNode.Id, 
                                     _parentNode.PresidentNode.EndPoint.ToString());
         await _parentNode.Client.SendMessageToNode(leader, node, false, false);
+        Console.WriteLine("[Transaction] Received FindLeader message from [{0},{1}:{2}]", node.Id, node.IPAddress, node.PortNumber);
     }
 
     /// <summary>

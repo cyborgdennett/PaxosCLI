@@ -55,8 +55,9 @@ public class Server
     private async Task ReceiveRequest(byte[] request, IPEndPoint ip) 
     {
         Message receivedMessage = MessageHelper.ByteArrayToMessage(request);
-        Node sender = _parentNode.Peers.GetNodeById(receivedMessage._senderId);
-        if (!(sender.IPAddress.Equals("127.0.0.1") && sender.Id.Equals(Int32.MinValue))) { //check if sender is a known Node
+        Node sender = _parentNode.Peers.GetNodeByIp(ip);
+        
+        if (!(sender.IPAddress.Equals(IPAddress.Parse("127.0.0.1")) && sender.Id.Equals(Int32.MinValue))) { //check if sender is a known Node
 
             UpdateOnlineStatus(sender);
 
@@ -128,7 +129,6 @@ public class Server
                     _parentNode.Proposer.OnTransactionProposal(transactionProposal);
                     break;
                 case "FindLeader":
-                    //TODO: 
                     FindLeader findLeader = (FindLeader)receivedMessage;
                     await _parentNode.Acceptor.OnReceiveFindLeader(findLeader, sender);
                     break;
@@ -151,6 +151,7 @@ public class Server
         }
         else //If sender is not known in the network, it can only be other network-nodes trying to send a transaction
         {
+            sender = new(ip);
             switch (receivedMessage.GetType().Name)
             {
                 //TransactionMessages
@@ -210,6 +211,9 @@ public class Server
         {
             //Wait for potential new president
         }
+        Console.WriteLine(_IPEndPoint);
+        //listener.Client.Bind(_IPEndPoint);
+
         //added for 'An existing connection was forcibly closed by the remote host'-error. 
         uint IOC_IN = 0x80000000;
         uint IOC_VENDOR = 0x18000000;
