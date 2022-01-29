@@ -126,23 +126,23 @@ public class Server
                 //TransactionMessages
                 case "TransactionProposal": //Notice this can only be received if the sender is in current network
                     TransactionProposal transactionProposal = (TransactionProposal)receivedMessage;
-                    _parentNode.Proposer.OnTransactionProposal(transactionProposal);
+                    _parentNode.NetworkTransaction.OnTransactionProposal(transactionProposal);
                     break;
                 case "FindLeader":
                     FindLeader findLeader = (FindLeader)receivedMessage;
-                    await _parentNode.Acceptor.OnReceiveFindLeader(findLeader, sender);
+                    await _parentNode.NetworkTransaction.OnReceiveFindLeader(findLeader, sender);
                     break;
                 case "Leader":
                     Leader leader = (Leader)receivedMessage;
-                    await _parentNode.Proposer.OnLeader(leader);
+                    await _parentNode.NetworkTransaction.OnLeader(leader);
                     break;
                 case "Transaction":
                     Transaction transaction = (Transaction)receivedMessage;
-                    await _parentNode.Proposer.OnTransaction(transaction, sender);
+                    await _parentNode.NetworkTransaction.OnTransaction(transaction, sender);
                     break;
                 case "TransactionSuccess":
                     TransactionSuccess transactionSuccess = (TransactionSuccess)receivedMessage;            
-                    await _parentNode.Proposer.OnTransactionSuccess(transactionSuccess);
+                    await _parentNode.NetworkTransaction.OnTransactionSuccess(transactionSuccess);
                     break;
                 default:
                     Console.WriteLine("Unknown request received.");
@@ -157,19 +157,19 @@ public class Server
                 //TransactionMessages
                 case "FindLeader":
                     FindLeader findLeader = (FindLeader)receivedMessage;
-                    await _parentNode.Acceptor.OnReceiveFindLeader(findLeader, sender);
+                    await _parentNode.NetworkTransaction.OnReceiveFindLeader(findLeader, sender);
                     break;
                 case "Leader":
                     Leader leader = (Leader)receivedMessage;
-                    await _parentNode.Proposer.OnLeader(leader);
+                    await _parentNode.NetworkTransaction.OnLeader(leader);
                     break;
                 case "Transaction":
                     Transaction transaction = (Transaction)receivedMessage;
-                    await _parentNode.Proposer.OnTransaction(transaction, sender);
+                    await _parentNode.NetworkTransaction.OnTransaction(transaction, sender);
                     break;
                 case "TransactionSuccess":
                     TransactionSuccess transactionSuccess = (TransactionSuccess)receivedMessage;            
-                    await _parentNode.Proposer.OnTransactionSuccess(transactionSuccess);
+                    await _parentNode.NetworkTransaction.OnTransactionSuccess(transactionSuccess);
                     break;
                 default:
                     Console.WriteLine("Unknown request received.");

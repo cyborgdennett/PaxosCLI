@@ -148,7 +148,7 @@ namespace PaxosCLITest
             Console.WriteLine("[Test] Wakeup...");
 
             if (testNodeList.Exists(x => x.Node.PortNumber == 10001))
-                testNodeList[1].Node.testinput("", "This is a test 1234 beep boop");
+                testNodeList[1].Node.ManualInput("", "This is a test 1234 beep boop");
             Thread.Sleep(2000);
 
             //Assert.IsTrue(true);
@@ -213,7 +213,7 @@ namespace PaxosCLITest
             Console.WriteLine("[Test] Wakeup...");
 
             if (testNodeList.Exists(x => x.Node.PortNumber == 10001))
-                testNodeList[1].Node.testinput("HomeNetwork-0123", "Transaction Testing...");
+                testNodeList[1].Node.ManualInput("HomeNetwork-0123", "Transaction Testing...");
             Console.WriteLine("[Test] Wakeup...");
             for (int i = 9; i < 13; i++)
             {
@@ -266,6 +266,16 @@ namespace PaxosCLITest
             client.Send(transactionsuccessbuffer, transactionsuccessbuffer.Length, HomeAddress);
 
             //testNode.Node.testinput("", "This is a test 1234 beep boop");
+        }
+        [TestMethod]
+        public void TestBoolString()
+        {
+            bool t = true;
+            bool f = false;
+            string a = t.ToString();
+            string b = f.ToString();
+            Console.WriteLine(a, b);
+            Assert.IsTrue(a == "True");
         }
         [TestMethod]
         public void TestExecuteCrossNetwork()

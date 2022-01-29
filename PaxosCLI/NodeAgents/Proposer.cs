@@ -16,21 +16,16 @@ public class Proposer
     public static readonly string OLIVE_DAY_DECREE = "The ides of February is national olive day";
     public bool presidentInitTaskFinished;
     private Queue<byte[]> Proposals;
-    private Queue<Tuple<string, byte[]>> TransactionProposals;
+    private Queue<byte[]> InputProposals;
     private int totalQueeSize = 5;
     private Thread ExecutePaxosOnReceivedProposalThread;
-    public ConcurrentDictionary<String, Node> NetworkLeaderNodes = new();
-    public SemaphoreSlim _messagesAvailable = new SemaphoreSlim(0);
-    private ConcurrentDictionary<int, bool> FoundTransactionIds = new();
-    private Queue<Tuple<string, int, byte[], Node>> TransactionQueue;//Received transactions
     Thread BeginProposingOnInputThread;
 
     public Proposer(Node node)
     {
         _parentNode = node;
-        Proposals = new Queue<byte[]>();
-        TransactionProposals = new Queue<Tuple<string, byte[]>>();
-        TransactionQueue = new Queue<Tuple<string, int, byte[], Node>>();
+        Proposals = new();
+        InputProposals = new();
     }
 
     /// <summary>
@@ -52,6 +47,10 @@ public class Proposer
         }
         
         return new Tuple<string, string>("", input);
+    }
+    public void AddDecreeProposal(string decree)
+    {
+        InputProposals.Enqueue(MessageHelper.StringToByteArray(decree));
     }
 
     /// <summary>
@@ -88,25 +87,17 @@ public class Proposer
         while (_parentNode.Client.IsSending && _parentNode.Server.isListening)
         {
             Thread.Sleep(500);
-            Tuple<string, string> inputtuple = null;
-            if (!_parentNode._messages.TryDequeue(out inputtuple))
+            if (!InputProposals.TryDequeue(out var decree))
                 continue;
-            if(inputtuple == null) continue;
+            if(decree == null) continue;
             
-            Console.WriteLine("[Proposer] Received systeminput... starting proposing sequence on: {0}",inputtuple);
+            Console.WriteLine("[Proposer] Received input... start proposing: {0}",MessageHelper.ByteArrayToString(decree));
 
-            byte[] inputInBytes = MessageHelper.StringToByteArray(inputtuple.Item2);
+            byte[] inputInBytes = decree;
 
             if (_parentNode.isPresident)
             {
-                if (inputtuple.Item1 == "")
-                {
-                    Proposals.Enqueue(inputInBytes);
-                }
-                else
-                {
-                    TransactionProposals.Enqueue(new Tuple<string, byte[]>(inputtuple.Item1, inputInBytes));
-                }
+                Proposals.Enqueue(inputInBytes);
             }
             else if (!_parentNode.isPresident)
             {
@@ -118,66 +109,16 @@ public class Proposer
                         Thread.Sleep(100);
                     }
                 }
-                Message msg;
 
                 //send the proposal to the president
-                if (inputtuple.Item1 == "")
-                    msg = new DecreeProposal(_parentNode.Client._messageIdCounter,
+                var msg = new DecreeProposal(_parentNode.Client._messageIdCounter,
                                                                 _parentNode.Id, inputInBytes);
-                else 
-                    msg = new TransactionProposal(_parentNode.Client._messageIdCounter,
-                                                                _parentNode.Id, inputtuple.Item1, inputInBytes);
 
                 await _parentNode.Client.SendMessageToNode(msg, _parentNode.PresidentNode, true, true);
             }
         }
     }
 
-    public async Task ProposeOnInput(Tuple<string, string> inputtuple)
-    {
-        while (!_parentNode.Client.IsSending && !_parentNode.Server.isListening
-                || (_parentNode.isPresident && !presidentInitTaskFinished))
-        {
-            //If the current node is a president, wait for the inital president tasks to be finished
-            Thread.Sleep(100);
-        }
-
-        if (inputtuple == null) return;
-
-        Console.WriteLine(inputtuple.Item1);
-        byte[] inputInBytes = MessageHelper.StringToByteArray(inputtuple.Item2);
-
-        if (_parentNode.isPresident)
-        {
-            if (inputtuple.Item1 == "")
-                Proposals.Enqueue(inputInBytes);
-            else
-            {
-                TransactionProposals.Enqueue(new Tuple<string, byte[]>(inputtuple.Item1, inputInBytes));
-            }
-        }
-        else if (!_parentNode.isPresident)
-        {
-            if (_parentNode.PresidentNode == null)
-            {
-                Console.WriteLine("[Proposer] Waiting for president to be known...");
-                while (_parentNode.PresidentNode == null)
-                {
-                    Thread.Sleep(100);
-                }
-            }
-            Message msg;
-
-            //send the proposal to the president
-            if (inputtuple.Item1 == "")
-                msg = new DecreeProposal(_parentNode.Client._messageIdCounter,
-                                                            _parentNode.Id, inputInBytes);
-            else
-                msg = new TransactionProposal(_parentNode.Client._messageIdCounter,
-                                                            _parentNode.Id, inputtuple.Item1, inputInBytes);
-            await _parentNode.Client.SendMessageToNode(msg, _parentNode.PresidentNode, true, true);
-        }
-    }
 
     /// <summary>
     /// Whenever a round of Paxos needs to be started (trying to get a decree written), this function needs to be called.
@@ -286,146 +227,7 @@ public class Proposer
         }
     }
 
-    public async Task ExecuteCrossNetwork(decimal decreeId, string network)
-    {
-        try
-        {
-            //Check if decree is known
-            byte[] decree = await _parentNode.LedgerHelper.GetOutcome((long)decreeId);
-            if (decree == null)
-            {
-                Console.WriteLine("[Proposer] Transaction Error: Decree unknown");
-                return;
-            }
-            //if you are at your own networkname, you can stop the procedure and send a success message to the other Leader
-            if (_parentNode.NetworkName == network)
-            {
-                Console.WriteLine("[Proposer] Transaction Error: Cannot send transaction to own network");
-                return;
-            }
-            string NETWORK_FILE_PATH = "Nodes/" + network + ".csv";
-            if (!File.Exists(NETWORK_FILE_PATH))
-            {
-                Console.WriteLine("[Proposer] Transaction Error: Network " + NETWORK_FILE_PATH + " not found");
-                return;
-            }
-
-            string[] endpoints = File.ReadAllLines(NETWORK_FILE_PATH);
-
-            if (endpoints.Length== 0)
-            {
-                Console.WriteLine("[Proposer] Transaction Error: Network " + NETWORK_FILE_PATH + " file empty");
-                return;
-            }
-
-            //Make an cluster of the csv file
-            Cluster TransactionNodes = new();
-
-            bool skip = false;
-            foreach (string endpoint in endpoints)
-            {
-                if (!skip)
-                {
-                    skip = true;
-                    continue;
-                }
-                Console.WriteLine(endpoint);
-                string[] endpointPropterties = endpoint.Split(',');
-                int e_id = Int32.Parse(endpointPropterties[0]);
-                System.Net.IPAddress e_ip = System.Net.IPAddress.Parse(endpointPropterties[1]);
-                int e_port = Int32.Parse(endpointPropterties[2]);
-                Node e_node = new Node(e_id, e_ip, e_port);
-
-                TransactionNodes.TryAdd(e_id, e_node);
-            }
-
-            Random rand = new();
-            //create random transactionId
-            int transactionId = rand.Next(0, Int16.MaxValue);
-            //NetworkLeaderNodes.TryRemove(network);
-            //NetworkLeaderNodes[network] = null;
-            //make "Find Leader"-message and send to the cluster
-            FindLeader findLeaderMsg = new(_parentNode.Client._messageIdCounter, _parentNode.Id, network);
-
-            foreach ((int i, Node n) in TransactionNodes)
-            {
-                Console.WriteLine("Sending to: {0}, from {1}", n.PortNumber, _parentNode.PortNumber);
-                await _parentNode.Client.SendMessageToNode(findLeaderMsg, n, false, false);
-            }
-
-            DateTime t = DateTime.Now;
-            bool found = false;
-            Node networkLeader;
-            while ((DateTime.Now - t).TotalSeconds < 2.0)
-            {
-                if (NetworkLeaderNodes.TryGetValue(network, out networkLeader) && networkLeader != null)
-                {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found)
-            {
-                Console.WriteLine("[Proposer] Transaction Error: FindLeader timeout");
-                foreach(var a in NetworkLeaderNodes)
-                {
-                    Console.WriteLine(a.Value.ToString());
-                }
-                return;
-            }
-
-            Transaction transactionMsg = new(_parentNode.Client._messageIdCounter, _parentNode.Id, network, transactionId, decree);
-            await _parentNode.Client.SendMessageToNode(transactionMsg, NetworkLeaderNodes[network], false, false);
-
-            t = DateTime.Now;
-            found = false;
-            while ((DateTime.Now - t).TotalSeconds < 2.0)
-            {
-                if (FoundTransactionIds.TryGetValue(transactionId, out found))
-                {
-                    if (!found) continue;
-                    Console.WriteLine("[Proposer] Transaction [{0}] complete", transactionId);
-                    break;
-                }
-            }
-            if (!found)
-            {
-                Console.WriteLine("[Proposer] Transaction Error: TransactionSuccess timeout");
-                return;
-            }
-        }
-        catch(Exception ex) { Console.WriteLine(ex.Message); }
-    }
-
-    public async Task OnLeader(Leader leader)
-    {
-        Console.WriteLine(leader._ip);
-        try
-        {
-            var ipe = System.Net.IPEndPoint.Parse(leader._ip);
-            var ip = ipe.Address;
-            var port = ipe.Port;
-            //System.Net.IPAddress ip = System.Net.IPAddress.Parse(leader._ip.Substring(0, leader._ip.IndexOf(':')));
-            //int port = int.Parse(leader._ip.Substring(leader._ip.IndexOf(':')+1));   
-            Node leaderNode = new Node(leader._nodeId, ip, port);
-            NetworkLeaderNodes[leader._networkName] = leaderNode;
-            Console.WriteLine("[Proposer] added node [{0}] as leader of network [{1}]",leader._nodeId, leader._networkName);
-        } 
-        catch (Exception ex) { Console.WriteLine("[Proposer] received invalid IP");}
-
-    }
-
-    public async Task OnTransactionSuccess(TransactionSuccess message)
-    {
-        FoundTransactionIds.TryAdd(message._transactionId, true);
-        Console.WriteLine("[Proposer] Received TransactionSuccess message with id[{0}]",message._transactionId );
-    }
-
-    public async Task OnTransaction(Transaction transaction, Node node) 
-    { 
-        TransactionQueue.Enqueue(new Tuple<string, int, byte[], Node>(transaction._networkName, transaction._transactionId, transaction._decree, node));
-        Console.WriteLine("[Proposer] Received transaction message");
-    }
+    
 
     public async Task<int> TryNewBallot()
     {
@@ -632,11 +434,10 @@ public class Proposer
                 {
                     LedgerEntry lastEntryInDb = null;
 
-                    using (Ledger ledger = new Ledger())
+                    using (Ledger ledger = new Ledger(_parentNode.LedgerHelper._databaseName))
                     {
                         lastEntryInDb = await ledger.Entries.OrderBy(l => l.Id).LastOrDefaultAsync();
                     }
-
                     if (lastEntryInDb != null)
                     {
                         _parentNode.entryId = lastEntryInDb.Id;
@@ -902,47 +703,6 @@ public class Proposer
                 {
                     while (presidentInitTaskFinished)
                     {
-
-                        //This part is for transactions proposals from own to other networks
-                        if (TransactionProposals.Count() > 0
-                            && _parentNode.status == NodeStatus.idle
-                            && GetOnlineNodes().HasMajorityOf(_parentNode.AllNodes))
-                        {
-                            Tuple<string, byte[]> toBallot = TransactionProposals.Dequeue();
-                            await ExecutePaxos(toBallot.Item2, false, true, 0);
-
-                            Console.WriteLine(toBallot.Item2.ToString());
-
-                            //Check if the ballot is passed and written in the ledger
-                            if (_parentNode.prevDec == toBallot.Item2)
-                            {
-                                Console.WriteLine("Transaction has been written in ledger, sending to [{0}]",toBallot.Item1);
-                                //send the transaction to the other network
-                                await ExecuteCrossNetwork(_parentNode.prevBal, toBallot.Item1);
-                            }
-
-                        }
-
-                        //This part is for received Transactions from other networks
-                        if(TransactionQueue.Count() > 0
-                            && _parentNode.status == NodeStatus.idle
-                            && GetOnlineNodes().HasMajorityOf(_parentNode.AllNodes))
-                        {
-                            Tuple<string, int, byte[], Node> toBallot = TransactionQueue.Dequeue();
-                            await ExecutePaxos(toBallot.Item3, false, true, 0);
-
-                            //Check if the ballot is passed and written in the ledger
-                            if (_parentNode.prevDec == toBallot.Item3)
-                            {
-                                Console.WriteLine("Transaction [{0}] from network [{1}] has been written in the ledger", toBallot.Item2, toBallot.Item1);
-                                //Give notice to sender network
-                                TransactionSuccess message = new(_parentNode.Client._messageIdCounter, _parentNode.Id, toBallot.Item1,toBallot.Item2);
-                                await _parentNode.Client.SendMessageToNode(message, toBallot.Item4, false, false);
-                            }
-                        }
-
-
-                        //This part is for Decrees
                         if (Proposals.Count() > 0
                             && _parentNode.status == NodeStatus.idle
                             && GetOnlineNodes().HasMajorityOf(_parentNode.AllNodes))
@@ -954,7 +714,7 @@ public class Proposer
                                 await ExecutePaxos(toBallot, false, true, 0);
                             }
                             else
-                            {
+                            { //use compressed paxos if proposal count is higher than 1
                                 byte[] toBallot = Proposals.Dequeue();
                                 await ExecutePaxosLoop(toBallot, false, true, 0);
                             }
@@ -1029,14 +789,7 @@ public class Proposer
         Proposals.Enqueue(decreeProposal._decree);
     }
 
-    /// <summary>
-    /// TODO: make sure that after it is in the own network, it will be send to the other network
-    /// </summary>
-    /// <param name="decreeProposal"></param>
-    public void OnTransactionProposal(TransactionProposal transactionProposal)
-    {
-        TransactionProposals.Enqueue(new Tuple<string, byte[]>(transactionProposal._networkName, transactionProposal._decree));
-    }
+   
 
     private async Task IncrementBallotId()
     {

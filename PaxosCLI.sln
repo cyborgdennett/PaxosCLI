@@ -5,7 +5,12 @@ VisualStudioVersion = 17.1.31903.286
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PaxosCLI", "PaxosCLI\PaxosCLI.csproj", "{9A1CAC89-3910-41D7-BC33-FBB81D33379D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PaxosCLITest", "PaxosCLITest\PaxosCLITest.csproj", "{29E0D0BC-CDBB-4A0D-A945-684E73CAE059}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PaxosCLITest", "PaxosCLITest\PaxosCLITest.csproj", "{29E0D0BC-CDBB-4A0D-A945-684E73CAE059}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PaxosCLIApp", "PaxosCLIApp\PaxosCLIApp.csproj", "{FDAF87D8-DFD0-4E62-AA8D-68D8B2483267}"
+	ProjectSection(ProjectDependencies) = postProject
+		{9A1CAC89-3910-41D7-BC33-FBB81D33379D} = {9A1CAC89-3910-41D7-BC33-FBB81D33379D}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,6 +26,10 @@ Global
 		{29E0D0BC-CDBB-4A0D-A945-684E73CAE059}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{29E0D0BC-CDBB-4A0D-A945-684E73CAE059}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{29E0D0BC-CDBB-4A0D-A945-684E73CAE059}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FDAF87D8-DFD0-4E62-AA8D-68D8B2483267}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FDAF87D8-DFD0-4E62-AA8D-68D8B2483267}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FDAF87D8-DFD0-4E62-AA8D-68D8B2483267}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FDAF87D8-DFD0-4E62-AA8D-68D8B2483267}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -106,7 +106,7 @@ public class Learner
     /// </summary>
     private async Task AddOrUpdateLedgerEntries(List<LedgerEntry> entriesToWrite)
     {
-        using (Ledger ledger = new Ledger())
+        using (Ledger ledger = new Ledger(_parentNode.LedgerHelper._databaseName))
         {
             foreach (LedgerEntry entryToWrite in entriesToWrite)
             {

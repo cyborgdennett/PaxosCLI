@@ -46,6 +46,7 @@ public class Node
     public Proposer Proposer { get; private set; }
     public Acceptor Acceptor { get; private set; }
     public Learner Learner { get; private set; }
+    public NetworkTransaction NetworkTransaction { get; private set; }
     public Node PresidentNode;
 
     //sensor variables
@@ -82,17 +83,18 @@ public class Node
     public readonly LedgerHelper LedgerHelper;
 
     /// <summary>
-    /// !!!REMOVE AFTER USE
+    /// Manual decree injections from Program.
     /// </summary>
     /// <param name="input"></param>
-    public ConcurrentQueue<Tuple<string, string>> _messages = new ConcurrentQueue<Tuple<string,string>>();
+    public ConcurrentQueue<string> InputMessages;
     public SemaphoreSlim _messagesAvailable = new SemaphoreSlim(0);
-    public void testinput(string network, string input)
+    public void ManualInput(string decree, string network = "")
     {
-        Tuple<string, string> testvalues = new Tuple<string, string>(network,input);
-        Console.WriteLine("testinput");
-
-        _messages.Enqueue(testvalues);
+        //Console.WriteLine("[Node] Received input [{0}]", decree);
+        if (network == "")
+            Proposer.AddDecreeProposal(decree);
+        else
+            NetworkTransaction.AddTransaction(network, decree);
     }
     
 
@@ -147,6 +149,8 @@ public class Node
         PortNumber = port;
         NetworkName = networkName;
 
+        InputMessages = new();
+
         GetConnectionInformation();
         dbAddress = "ledger_" + networkName + "_" + Id.ToString() + ".db";
         LedgerHelper = new LedgerHelper();
@@ -155,7 +159,6 @@ public class Node
 
         PrepareDB(); //DISABLE WHEN NOT NEEDED. SQLite needs this.
 
-        //GetConnectionInformation();
         if (canExecute)
         {
             InitRoles();
@@ -370,6 +373,7 @@ public class Node
     /// </summary>
     private void InitRoles()
     {
+        NetworkTransaction = new NetworkTransaction(this);
         Proposer = new Proposer(this);
         Acceptor = new Acceptor(this);
         Learner = new Learner(this);
