@@ -86,8 +86,6 @@ public class Node
     /// Manual decree injections from Program.
     /// </summary>
     /// <param name="input"></param>
-    public ConcurrentQueue<string> InputMessages;
-    public SemaphoreSlim _messagesAvailable = new SemaphoreSlim(0);
     public void ManualInput(string decree, string network = "")
     {
         //Console.WriteLine("[Node] Received input [{0}]", decree);
@@ -125,22 +123,6 @@ public class Node
     }
 
     /// <summary>
-    ///  Constructor for without arduino
-    /// </summary>
-    /*public Node(int port = 10000)
-    {
-        PortNumber = port;
-        PrepareDB(); //DISABLE WHEN NOT NEEDED. SQLite needs this.
-        GetConnectionInformation();
-        if (canExecute)
-        {
-            InitRoles();
-            GetLedgerVariables();
-            ConnectToNetwork().Wait();
-        }
-    }*/
-
-    /// <summary>
     /// Constructor to start the own Node with the name of its own network.
     /// </summary>
     /// <param name="networkName"></param>
@@ -148,8 +130,6 @@ public class Node
     {
         PortNumber = port;
         NetworkName = networkName;
-
-        InputMessages = new();
 
         GetConnectionInformation();
         dbAddress = "ledger_" + networkName + "_" + Id.ToString() + ".db";

@@ -212,15 +212,16 @@ namespace PaxosCLITest
             }
             Console.WriteLine("[Test] Wakeup...");
 
+            var inputstring = "TransactionTest 1234 test test";
             if (testNodeList.Exists(x => x.Node.PortNumber == 10001))
-                testNodeList[1].Node.ManualInput("HomeNetwork-0123", "Transaction Testing...");
+                testNodeList[1].Node.ManualInput("HomeNetwork-0123", inputstring);
             Console.WriteLine("[Test] Wakeup...");
             for (int i = 9; i < 13; i++)
             {
                 Console.WriteLine("[Test] Initialising... {0}", i);
                 Thread.Sleep(500);
             }
-            
+            string str = "unused";
             Thread t = new Thread(async () =>
             {
                 List < List < PaxosCLI.Database.LedgerEntry >> ledgerentries = new();
@@ -231,9 +232,13 @@ namespace PaxosCLITest
                 
                 //check if whole list is the same
                 Assert.IsTrue(ledgerentries.Any(o => o != ledgerentries[0]) , "Ledgers do not have same contents");
+                Console.WriteLine(ledgerentries[0][0].Decree);
+                str = ledgerentries[0][0].Decree;
+            Assert.IsTrue(ledgerentries.Any(o => o[0].Decree != inputstring), "Ledgers do not have same contents");
             });
             t.Start();       
             t.Join();
+            Console.WriteLine(str);
         }
         [TestMethod]
         public void TestSingleMessageDelivery()

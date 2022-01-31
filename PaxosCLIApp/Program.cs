@@ -14,11 +14,15 @@ using System.Collections.Generic;
 public class Program
 {
 
-    public static void Main()
+    public static void Main(string[] args)
     {
         var p = new Program();
-
-        p.startup();
+        foreach (string a in args)
+        {
+            if(a == "cleanup")
+                p.startup();
+            Console.WriteLine(a);
+        }
         p.addNodeFile("testnetwork", new List<(int, int)> { (1, 10000), (2, 10001) });
         p.addNodeFile("HomeNetwork-0123", new List<(int, int)> { (1, 10002), (2, 10003) });
 
