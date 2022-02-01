@@ -17,19 +17,18 @@ public class Program
     public static void Main(string[] args)
     {
         var p = new Program();
-        foreach (string a in args)
-        {
-            if(a == "cleanup")
-                p.startup();
-            Console.WriteLine(a);
-        }
-        p.addNodeFile("testnetwork", new List<(int, int)> { (1, 10000), (2, 10001) });
-        p.addNodeFile("HomeNetwork-0123", new List<(int, int)> { (1, 10002), (2, 10003) });
+        
+        p.startup();
+        p.addNodeFile("testnetwork", new List<(int, int)> { (1, 10000) });
+        p.addNodeFile("testnetwork", new List<(int, int)> { (2, 10001) }, IPAddress.Parse("145.137.125.85"));
+        p.addNodeFile("HomeNetwork-0123", new List<(int, int)> { (1, 10002) });
+        p.addNodeFile("HomeNetwork-0123", new List<(int, int)> { (2, 10003) }, IPAddress.Parse("145.137.125.85"));
 
         var testNodeList = new List<TestNode>() { new TestNode(10000, "testnetwork"),
-                                                    new TestNode(10001, "testnetwork"),
+                                                    //new TestNode(10001, "testnetwork"),
                                                     new TestNode(10002, "HomeNetwork-0123"),
-                                                    new TestNode(10003, "HomeNetwork-0123")};
+                                                    //new TestNode(10003, "HomeNetwork-0123")
+                                                    };
         testNodeList.ForEach(node => node.start());
 
 
@@ -91,7 +90,7 @@ public class Program
         }
         catch (Exception ex) { }
     }
-    public void addNodeFile(string network, List<(int, int)> idport)
+    public void addNodeFile(string network, List<(int, int)> idport, IPAddress ipa = null)
     {
         var stringpath = Directory.GetCurrentDirectory();
         var nodespath = Path.Combine(stringpath, "Nodes");
@@ -101,16 +100,16 @@ public class Program
             File.Create(filepath).Dispose();
         }
         Thread.Sleep(5);
-        using (System.IO.FileStream fs = File.OpenWrite(filepath))
+        using (System.IO.StreamWriter fs = File.AppendText(filepath))
         {
-            var ip = GetLocalActiveIpAddress();
+            var ip = ipa == null ? GetLocalActiveIpAddress() : ipa;
             StringBuilder ipstring = new StringBuilder();
             foreach ((int id, int port) in idport)
             {
                 ipstring.Append("\n" + id.ToString() + "," + ip.ToString() + "," + port.ToString());
             }
-            byte[] bytestring = Encoding.UTF8.GetBytes(ipstring.ToString());
-            fs.Write(bytestring, 0, bytestring.Length);
+            fs.Write(ipstring);
+            fs.Close();
         }
     }
     class TestNode

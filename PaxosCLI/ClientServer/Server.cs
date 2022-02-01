@@ -215,10 +215,13 @@ public class Server
         //listener.Client.Bind(_IPEndPoint);
 
         //added for 'An existing connection was forcibly closed by the remote host'-error. 
-        uint IOC_IN = 0x80000000;
-        uint IOC_VENDOR = 0x18000000;
-        uint SIO_UDP_CONNRESET = IOC_IN | IOC_VENDOR | 12;
-        listener.Client.IOControl((int)SIO_UDP_CONNRESET, new byte[] { Convert.ToByte(false) }, null);
+        if (OperatingSystem.IsWindows())
+        {
+            uint IOC_IN = 0x80000000;
+            uint IOC_VENDOR = 0x18000000;
+            uint SIO_UDP_CONNRESET = IOC_IN | IOC_VENDOR | 12;
+            listener.Client.IOControl((int)SIO_UDP_CONNRESET, new byte[] { Convert.ToByte(false) }, null);
+        }
 
         listener.BeginReceive(new AsyncCallback(ReceiveMessageAsync), null);
         isListening = true;
