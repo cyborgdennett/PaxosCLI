@@ -23,6 +23,10 @@ public class Ledger : DbContext
         // At the moment the SQLite database provider is used to store data.
         // It can be changed to many kinds of databases. See https://docs.microsoft.com/en-us/ef/core/providers/
         //optionsBuilder.UseSqlite("Data Source=ledger.db");
+        if (OperatingSystem.IsLinux())
+        {
+            filename = "./" + filename;
+        }
         optionsBuilder.UseSqlite("Data Source=" + filename);
     }
 
