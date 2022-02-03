@@ -10,27 +10,70 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 public class Program
 {
 
     public static void Main(string[] args)
     {
+
+        string[] arg = { };
+        if (args.Length != 0)
+        {
+
+            Console.WriteLine(args[0]);
+            arg = args[0].Split(";");
+        }
+
+        if (arg.ElementAtOrDefault(0) == "newnode")
+        {
+            Console.Title = arg.ElementAtOrDefault(2) + arg.ElementAtOrDefault(1);
+            TestNode t = new TestNode(Int16.Parse(arg[1]),arg[2]);
+            t.start();
+            while (true)
+            {
+                try
+                {
+                    Console.WriteLine("Enter decree message. For transaction, end message with ';network' where network is target network.");
+                    var input = Console.ReadLine().Split(";");
+                    if(input.Length == 1)
+                        t.Node.ManualInput(input[0]);
+                    else
+                        t.Node.ManualInput(input[0], input[1]);
+                }
+                catch (Exception ex) { }
+
+
+            }
+        }
+
         var p = new Program();
-        
+
         p.startup();
         p.addNodeFile("testnetwork", new List<(int, int)> { (1, 10000) });
-        p.addNodeFile("testnetwork", new List<(int, int)> { (2, 10001) }, IPAddress.Parse("145.137.125.85"));
+        p.addNodeFile("testnetwork", new List<(int, int)> { (2, 10001) });
         p.addNodeFile("HomeNetwork-0123", new List<(int, int)> { (1, 10002) });
-        p.addNodeFile("HomeNetwork-0123", new List<(int, int)> { (2, 10003) }, IPAddress.Parse("145.137.125.85"));
+        p.addNodeFile("HomeNetwork-0123", new List<(int, int)> { (2, 10003) });
 
-        var testNodeList = new List<TestNode>() { new TestNode(10000, "testnetwork"),
-                                                    //new TestNode(10001, "testnetwork"),
-                                                    new TestNode(10002, "HomeNetwork-0123"),
-                                                    //new TestNode(10003, "HomeNetwork-0123")
+        
+        var testNodeList = new List<(int, string)>() { (10000, "testnetwork"),
+                                                    (10001, "testnetwork"),
+                                                    (10002, "HomeNetwork-0123"),
+                                                    (10003, "HomeNetwork-0123")
                                                     };
-        testNodeList.ForEach(node => node.start());
 
+        List<Process> process = new();
+        testNodeList.ForEach(x => process.Add(p.StartConsole(x.Item1, x.Item2)));
+        
+        Console.CancelKeyPress += delegate {
+            //cleanup methods
+            Console.WriteLine("Cleaning");
+            process.ForEach(p => p.CloseMainWindow());
+            process.ForEach(p => p.Close());
+            process.ForEach(p => p.Kill());
+            Console.WriteLine("Closing");
+        };
 
         for (int i = 0; i < 8; i++)
         {
@@ -39,22 +82,76 @@ public class Program
         }
         Console.WriteLine("[Test] Wakeup...");
 
-
-        while (true)
+        try
         {
-            try
+            Task.Run(() => 
             {
-                Console.WriteLine("Enter local node in list, network and decree msg.");
-                var input = Console.ReadLine().Split(";");
-                Console.WriteLine(input[0]);
-                Console.WriteLine(input[1]);
-                Console.WriteLine(input[2]);
-                //input.ForEach(x => Console.WriteLine(x));
-                testNodeList[Int16.Parse(input[0])].Node.ManualInput(input[2], input[1]);
+                while (process.Count > 0)
+                {
+
+                    foreach (Process proc in process)
+                    {
+                        if (proc.HasExited || proc.MainWindowTitle == "")
+                        {
+                            Console.WriteLine(proc.Id + " Has stopped");
+                            process.Remove(proc);
+                            break;
+                        }
+                    }
+                    Thread.Sleep(1000);
+                }
+                Console.WriteLine("all nodes stopped");
+            });
+            
+
+            while (process.Count > 0)
+            {
+                var i = Console.ReadLine();
+                if (i == "") continue;
+                var strings = i.Split(" ");
+                if (strings.ElementAtOrDefault(0) == "stop")
+                {
+                        
+                    if (Int16.TryParse(strings.ElementAtOrDefault(1), out var n)
+                        && n >= 0 && n < process.Count)
+                    {
+                        string name = process[n].MainWindowTitle;
+                        Console.WriteLine("Stopping " + name);
+                        Process pp = process[n];
+                        process[n].CloseMainWindow();
+                        process[n].Close();
+                        try { process[n].Kill(); }
+                        catch { }
+                        process.Remove(process[n]);
+                        Console.WriteLine("Stopped " + name);
+                    }
+                        
+                }
+                else if(strings.ElementAtOrDefault(0) == "start")
+                {
+                    if (Int16.TryParse(strings.ElementAtOrDefault(1), out var n)
+                        && n >= 0 && n < process.Count)
+                    {
+                        string name = process[n].MainWindowTitle;
+                        Console.WriteLine("Stopping " + name);
+                        Process pp = process[n];
+                        process[n].CloseMainWindow();
+                        process[n].Close();
+                        try { process[n].Kill(); }
+                        catch { }
+                        process.Remove(process[n]);
+                        Console.WriteLine("Stopped " + name);
+                    }
+                }
             }
-            catch (Exception ex) { }
 
-
+        }catch (Exception ex)
+        {
+            Console.WriteLine("An error occurred. Cleaning");
+            process.ForEach(p => p.CloseMainWindow());
+            process.ForEach(p => p.Close());
+            process.ForEach(p => p.Kill());
+            Console.WriteLine("Closing");
         }
     }
     public Program() { }
@@ -112,7 +209,7 @@ public class Program
             fs.Close();
         }
     }
-    class TestNode
+    public class TestNode
     {
         public volatile Node Node;
         public Thread Thread;
@@ -158,6 +255,21 @@ public class Program
         }
         Console.WriteLine("Local IPv4 couldn't be found in list of authorized nodes.");
         return null;
+    }
+
+    public Process StartConsole(int port, string network)
+    {
+        ProcessStartInfo psi = new ProcessStartInfo("cmd.exe")
+        {
+            UseShellExecute = true,
+            Arguments = $"/c dotnet run newnode;{port};{network}",
+            CreateNoWindow = false
+        };
+        Console.WriteLine(psi.Arguments);
+        Process p = Process.Start(psi);
+        p.EnableRaisingEvents = true;
+
+        return p;
     }
 
 }
