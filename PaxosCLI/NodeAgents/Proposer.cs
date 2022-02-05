@@ -107,7 +107,6 @@ public class Proposer
     /// <param name="isFill">If the decree is an unimportant (olive-day) decree</param>
     /// <param name="isNewDecree">If the decree is a new decree (not a learned decree)</param>
     /// <param name="entryId">The id of the decree</param>
-    /// <param name="entryId">The id of the decree</param>
     /// <returns></returns>
     public async Task ExecutePaxos(byte[] proposedDecree, bool isFill = false, bool isNewDecree = false, long entryId = 0)
     {
