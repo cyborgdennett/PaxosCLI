@@ -72,11 +72,15 @@ public class Heartbeat : Message
 
     public override byte[] ToByteArray()
     {
-        return MessageHelper.StringToByteArray(String.Format("{0},HB;{1},{2}",
+        return MessageHelper.StringToByteArray(this.ToString());
+    }
+    public override string ToString()
+    {
+        return String.Format("{0},HB;{1},{2}",
                                                                 _id.ToString(CultureInfo.InvariantCulture),
                                                                 _lastTried.ToString(CultureInfo.InvariantCulture),
                                                                 _isPresident
-                                                                ));
+                                                                );
     }
 }
 
@@ -162,17 +166,14 @@ public class BeginBallot : Message
 
     public override byte[] ToByteArray()
     {
-        return MessageHelper.StringToByteArray(String.Format("{0},BB;{1},{2}",
-                                                                _id.ToString(CultureInfo.InvariantCulture),
-                                                                _ballotId.ToString(CultureInfo.InvariantCulture),
-                                                                MessageHelper.ByteArrayToString(_decree)));
+        return MessageHelper.StringToByteArray(this.ToString());
     }
     public override string ToString()
     {
         return String.Format("{0},BB;{1},{2}",
-                                                                _id.ToString(CultureInfo.InvariantCulture),
-                                                                _ballotId.ToString(CultureInfo.InvariantCulture),
-                                                                MessageHelper.ByteArrayToString(_decree));
+                                                        _id.ToString(CultureInfo.InvariantCulture),
+                                                        _ballotId.ToString(CultureInfo.InvariantCulture),
+                                                        MessageHelper.ByteArrayToString(_decree));
     }
 }
 
@@ -215,10 +216,14 @@ public class Success : Message
 
     public override byte[] ToByteArray()
     {
-        return MessageHelper.StringToByteArray(String.Format("{0},SS;{1},{2}",
-                                                                _id.ToString(CultureInfo.InvariantCulture),
-                                                                MessageHelper.ByteArrayToString(_decree),
-                                                                _decreeId));
+        return MessageHelper.StringToByteArray(this.ToString());
+    }
+    public override string ToString()
+    {
+        return String.Format("{0},SS,{1};{2}",
+                                    _id.ToString(CultureInfo.InvariantCulture),
+                                    _decreeId,
+                                    MessageHelper.ByteArrayToString(_decree));
     }
 }
 /// <summary>
@@ -229,20 +234,23 @@ public class SuccessBeginBallot : Message
     public BeginBallot beginBallotMsg;
     public Success successMsg;
 
-    public SuccessBeginBallot(long messageIdCounter, int senderId,
-                              byte[] decree, long decreeId,
-                              decimal ballotIdBB, byte[] decreeBB)
+    public SuccessBeginBallot(Success success, BeginBallot beginBallot)
     {
-        successMsg = new Success(messageIdCounter, senderId, decree, decreeId);
-        beginBallotMsg = new BeginBallot(messageIdCounter, senderId, ballotIdBB, decreeBB);
+        _id = beginBallot._id;
+        beginBallotMsg = beginBallot;
+        successMsg = success;
     }
     public override byte[] ToByteArray()
     {
-        return MessageHelper.StringToByteArray(String.Format("{0},SBB;",
-                                                                _id.ToString(CultureInfo.InvariantCulture))
-                                                                + successMsg.ToString().Split(";")[1] + ";"
-                                                                + beginBallotMsg.ToString().Split(";")[1]);
+        return MessageHelper.StringToByteArray(this.ToString());
     }
+    public override string ToString()
+    {
+        return String.Format("{0},SBB;{1};{2}",
+                                    _id.ToString(CultureInfo.InvariantCulture),
+                                    successMsg.ToString(),
+                                    beginBallotMsg.ToString());
+}
 }
 
 public class UpdateBallotNumber : Message

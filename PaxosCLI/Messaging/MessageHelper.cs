@@ -33,6 +33,20 @@ public static class MessageHelper
         return Encoding.ASCII.GetBytes(str);
     }
 
+    private static (long messageId, int senderId, string messageType, string[]? rest) GetMessageInformation(string msg)
+    {
+        try
+        {
+            string[] splitMessage = msg.Split(';');
+            string[] messageInformation = splitMessage[0].Split(',');
+            string[] fullMessageSplit = messageInformation[0].Split('.');
+            long messageId = long.Parse(fullMessageSplit[0]);
+            int senderId = Int32.Parse(fullMessageSplit[1]);
+            string messageType = messageInformation[1];
+            return (messageId, senderId, messageType, messageInformation);
+        }catch (FormatException) { return (-1,-1,"",null); }
+    }
+
     /// <summary>
     ///  Decodes a byte array to a message, if possible.
     ///  A typical message (e.g. a heartbeat) looks like: 1.1,HB;2.1,1 
@@ -45,18 +59,16 @@ public static class MessageHelper
     {
         try
         {
-            // Console.WriteLine("[{0}]", ByteArrayToString(bytes));
-            // Console.WriteLine("[Amount of bytes: {0}]", bytes.Length);
-
             //separate all the information of the message
             string[] splitMessage = ByteArrayToString(bytes).Split(';');
 
             //generic information for every kind of message
-            string[] messageInformation = splitMessage[0].Split(',');
-            string[] fullMessageSplit = messageInformation[0].Split('.');
-            long messageId = long.Parse(fullMessageSplit[0]);
-            int senderId = Int32.Parse(fullMessageSplit[1]);
-            string messageType = messageInformation[1];
+            var messageInformation = GetMessageInformation(ByteArrayToString(bytes));
+            if (messageInformation.senderId == -1) throw new Exception();
+
+            long messageId = messageInformation.messageId;
+            var senderId = messageInformation.senderId;
+            string messageType = messageInformation.messageType;
 
             //the content specialised for the type of message
             string[] messageContent = splitMessage[1].Split(',');
@@ -102,7 +114,7 @@ public static class MessageHelper
                 case "SS":
                     {
                         byte[] decree = StringToByteArray(messageContent[0]);
-                        long decreeId = long.Parse(messageContent[1]);
+                        long decreeId = long.Parse(messageInformation.rest[2]);
                         return new Success(messageId, senderId, decree, decreeId);
                     }
                 case "UBN":
@@ -128,51 +140,39 @@ public static class MessageHelper
                     }
                 case "SBB":
                     {
-
-                        //the content specialised for the type of message
-                        string[] messageContentBB = splitMessage[2].Split(',');
-
-                        //gets the parts of Success
-                        byte[] decreeSS = StringToByteArray(messageContent[0]);
-                        long decreeIdSS = long.Parse(messageContent[1]);
-
-                        //gets the parts of the BeginBallot
-                        decimal ballotIdBB = Decimal.Parse(messageContent[0], CultureInfo.InvariantCulture);
-                        byte[] decreeBB = StringToByteArray(messageContent[1]);
-
-                        return new SuccessBeginBallot(messageId, senderId,
-                                                      decreeSS, decreeIdSS,
-                                                      ballotIdBB, decreeBB);
+                        Success success = (Success)ByteArrayToMessage(MessageHelper.StringToByteArray(splitMessage[1] + ";" + splitMessage[2]));
+                        BeginBallot beginBallot = (BeginBallot)ByteArrayToMessage(MessageHelper.StringToByteArray(splitMessage[3] + ";" + splitMessage[4]));
+                        return new SuccessBeginBallot(success, beginBallot);
                     }
                 case "TP":
                     {
-                        string networkName = messageInformation[2];
+                        string networkName = messageInformation.rest[2];
                         byte[] decree = StringToByteArray(messageContent[0]);
                         return new TransactionProposal(messageId, senderId, networkName, decree);
                     }
                 case "FL":
                     {
-                        string networkName = messageInformation[2];
+                        string networkName = messageInformation.rest[2];
                         return new FindLeader(messageId, senderId, networkName);
                     }
                 case "L":
                     {
-                        string networkName = messageInformation[2];
-                        int Id = Int16.Parse(messageInformation[3]);
+                        string networkName = messageInformation.rest[2];
+                        int Id = Int16.Parse(messageInformation.rest[3]);
                         string Ip = messageContent[0];
                         return new Leader(messageId, senderId, networkName, Id, Ip);
                     }
                 case "T":
                     {
-                        string networkName = messageInformation[2];
+                        string networkName = messageInformation.rest[2];
                         byte[] decree = StringToByteArray(messageContent[0]);
-                        int transactionId = Int16.Parse(messageInformation[3]);
+                        int transactionId = Int16.Parse(messageInformation.rest[3]);
                         return new Transaction(messageId, senderId, networkName, transactionId, decree);
                     }
                 case "TS":
                     {                       
-                        int transactionId = Int16.Parse(messageInformation[3]);
-                        string networkName = messageInformation[2];
+                        int transactionId = Int16.Parse(messageInformation.rest[3]);
+                        string networkName = messageInformation.rest[2];
                         return new TransactionSuccess(messageId, senderId, networkName, transactionId);
                     }
                 default:

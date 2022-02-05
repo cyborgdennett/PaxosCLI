@@ -15,7 +15,8 @@ public class Proposer
     private DateTime TimeAtPreviousAction;
     public static readonly string OLIVE_DAY_DECREE = "The ides of February is national olive day";
     public bool presidentInitTaskFinished;
-    private Queue<byte[]> Proposals;
+    private ConcurrentQueue<byte[]> Proposals;
+    private Success? SavedSuccess; //Var to store Succes-part of SuccesBeginBallot-message in case of multiple proposals in queue
     private Queue<byte[]> InputProposals;
     private int totalQueeSize = 5;
     private Thread ExecutePaxosOnReceivedProposalThread;
@@ -28,26 +29,6 @@ public class Proposer
         InputProposals = new();
     }
 
-    /// <summary>
-    /// The first string is the network name or empty if not an transaction, the second is the decree
-    /// !!!Override this in the Program.cs for the application level
-    /// </summary>
-    /// <returns></returns>
-    public Tuple<string, string> Input()
-    {
-        string input;
-        if (_parentNode.hasSensor)
-        {
-            input = _parentNode.sensorData.Read().Trim();
-            if (input == "") return null;
-        }
-        else
-        {
-            input = Console.ReadLine();
-        }
-        
-        return new Tuple<string, string>("", input);
-    }
     public void AddDecreeProposal(string decree)
     {
         InputProposals.Enqueue(MessageHelper.StringToByteArray(decree));
@@ -83,10 +64,9 @@ public class Proposer
             Thread.Sleep(100);
         }
 
-        //TODO: create system that can use different input functions
         while (_parentNode.Client.IsSending && _parentNode.Server.isListening)
         {
-            Thread.Sleep(500);
+            //Thread.Sleep(1);
             if (!InputProposals.TryDequeue(out var decree))
                 continue;
             if(decree == null) continue;
@@ -127,6 +107,7 @@ public class Proposer
     /// <param name="isFill">If the decree is an unimportant (olive-day) decree</param>
     /// <param name="isNewDecree">If the decree is a new decree (not a learned decree)</param>
     /// <param name="entryId">The id of the decree</param>
+    /// <param name="entryId">The id of the decree</param>
     /// <returns></returns>
     public async Task ExecutePaxos(byte[] proposedDecree, bool isFill = false, bool isNewDecree = false, long entryId = 0)
     {
@@ -139,19 +120,24 @@ public class Proposer
         {
             Console.WriteLine("\n[Proposer] Executing Paxos");
 
-            int ballotSuccessful = 1;
+            //0 is undecided
+            //1 is succesful
+            //-1 is failed ballot
+            int ballotSuccessful = 0;
             do
             {
                 quorum = GetOnlineNodes();
                 _parentNode.status = NodeStatus.trying;
                 ballotSuccessful = await StartPollingMajoritySet(quorum, proposedDecree, isFill, isNewDecree, entryId);
-            } while (ballotSuccessful == 1);
+            } while (ballotSuccessful == 0);
 
-            if (ballotSuccessful == 0)
+
+            if (ballotSuccessful == 1)
             {
-                await Succeed();
+                await Succeed(Proposals.Count > 0);
             }
-            else if (ballotSuccessful == 2)
+            
+            else if (ballotSuccessful == -1)
             {
                 Console.WriteLine("[Proposer] Aborting Paxos");
             }
@@ -161,73 +147,6 @@ public class Proposer
             Console.WriteLine("[Proposer] Not ready to conduct ballot.");
         }
     }
-
-    /// <summary>
-    /// Do paxos untill all proposals are worked out in a looping fashion. This uses the message Success and BeginBallot in one untill you reach the last proposal.
-    /// </summary>
-    /// <param name="proposedDecree">The decree to write to the ledger</param>
-    /// <param name="isFill">If the decree is an unimportant (olive-day) decree</param>
-    /// <param name="isNewDecree">If the decree is a new decree (not a learned decree)</param>
-    /// <param name="entryId">The id of the decree</param>
-    /// <returns></returns>
-    public async Task ExecutePaxosLoop(byte[] proposedDecree, bool isFill = false, bool isNewDecree = false, long entryId = 0)
-    {
-        byte[] success = null;
-        int ballotSuccessful = 1;
-        while (Proposals.Count() >= 1)
-        {
-            Cluster quorum = GetOnlineNodes();
-            bool initFinished = ((!isNewDecree && !presidentInitTaskFinished) || presidentInitTaskFinished);
-
-            if (_parentNode.isPresident
-                && _parentNode.status == NodeStatus.idle
-                && initFinished)
-            {
-                Console.WriteLine("\n[Proposer] Executing CompressedPaxos");
-
-
-                if (ballotSuccessful == 2)
-                {
-                    Console.WriteLine("[Proposer] Aborting CompressedPaxos");
-                    _parentNode.CompressedPaxos = false;
-                    return;
-                }
-                //This is only used for the first iteration
-                else if (success == null)
-                {
-                    do
-                    {
-                        quorum = GetOnlineNodes();
-                        _parentNode.status = NodeStatus.trying;
-                        ballotSuccessful = await StartPollingMajoritySet(quorum, proposedDecree, isFill, isNewDecree, entryId);
-                    } while (ballotSuccessful == 1);
-                    _parentNode.CompressedPaxos = true;
-                }
-                else if (ballotSuccessful == 0 && await Succeed() == 1)
-                {
-                    success = await _parentNode.LedgerHelper.GetOutcome(_parentNode.entryId);
-                    if (success == null)
-                        return;
-
-                    proposedDecree = Proposals.Dequeue();
-                    //send a SuccessBeginBallotMessage
-                    do
-                    {
-                        quorum = GetOnlineNodes();
-                        _parentNode.status = NodeStatus.trying;
-                        ballotSuccessful = await StartPollingMajoritySet(quorum, proposedDecree, isFill, isNewDecree, entryId, success, _parentNode.entryId);
-                    } while (ballotSuccessful == 1);
-                }
-            }
-            else if (!initFinished)
-            {
-                Console.WriteLine("[Proposer] Not ready to conduct ballot.");
-                return;
-            }
-        }
-    }
-
-    
 
     public async Task<int> TryNewBallot()
     {
@@ -401,7 +320,7 @@ public class Proposer
     /// <param name="isNewDecree">If the current decree is a decree not written in the ledger yet</param>
     /// <param name="entryId">The decree id</param>
     /// <returns></returns>
-    private async Task<int> StartPollingMajoritySet(Cluster quorum, byte[] proposedDecree, bool isFill, bool isNewDecree, long entryId = 0, byte[]? success = null, long? successId = null)
+    private async Task<int> StartPollingMajoritySet(Cluster quorum, byte[] proposedDecree, bool isFill, bool isNewDecree, long entryId = 0)
     {
         //TODO this doesn't work if nodes leave the network (due to prevVote change).
         //although, the part-time parliament expects no node one to join or leave during operation.
@@ -432,7 +351,7 @@ public class Proposer
             {
                 if (!isFill) //when it's a normal entry
                 {
-                    LedgerEntry lastEntryInDb = null;
+                    LedgerEntry? lastEntryInDb;
 
                     using (Ledger ledger = new Ledger(_parentNode.LedgerHelper._databaseName))
                     {
@@ -463,58 +382,71 @@ public class Proposer
                 }
             }
 
-
-            if (success == null || successId == null)
+            if (_parentNode.CompressedPaxos && SavedSuccess != null)
+            {
+                Console.WriteLine("[Proposer] BeginBallot: decreeId={0}, decree={1}, quorum={2}", _parentNode.entryId, MessageHelper.ByteArrayToString(_parentNode.decree), String.Join(",", quorum.Keys.ToArray()));
+                return await SendSuccessBeginBallotMessage();
+            }
+            else
             {
                 Console.WriteLine("[Proposer] Ballot: decreeId={0}, decree={1}, quorum={2}", _parentNode.entryId, MessageHelper.ByteArrayToString(_parentNode.decree), String.Join(",", quorum.Keys.ToArray()));
                 return await SendBeginBallotMessage();
             }
-            else
-            {
-                Console.WriteLine("[Proposer] Success: decreeId={0}, decree={1}", successId, success);
-                Console.WriteLine("[Proposer] BeginBallot: decreeId={0}, decree={1}, quorum={2}", _parentNode.entryId, MessageHelper.ByteArrayToString(_parentNode.decree), String.Join(",", quorum.Keys.ToArray()));
-                return await SendSuccessBeginBallotMessage((long)successId, success);
-            }
         }
-        return 1;
+        return 0;
     }
 
     /// <summary>
     /// Send a success and beginballot msg in one.
-    /// !!!DOES NOT WORK!!!
+    /// Resets the SavedSuccess
     /// </summary>
-    /// <returns></returns>
-    private async Task<int> SendSuccessBeginBallotMessage(long successId, byte[] success)
+    /// <returns>'1' if succesfull, '-1' if unsuccesfull </returns>
+    private async Task<int> SendSuccessBeginBallotMessage()
     {
 
-        if (_parentNode.status == NodeStatus.polling && _parentNode.isPresident)
+        if (_parentNode.status == NodeStatus.polling && _parentNode.isPresident && SavedSuccess != null)
         {
             TimeAtPreviousAction = DateTime.Now;
 
-            Console.WriteLine("[Proposer] Sending passed decree [{0}:{1}] and NextBallot [{2}:{3}] to learners.", successId, MessageHelper.ByteArrayToString(success), _parentNode.lastTried, _parentNode.decree);
-            SuccessBeginBallot successBeginBallotMsg = new SuccessBeginBallot(_parentNode.Client._messageIdCounter, _parentNode.Id, success, successId, _parentNode.lastTried, _parentNode.decree);
-            await _parentNode.Client.SendMessageToCluster(successBeginBallotMsg, _parentNode.quorum.GetClusterExcludingNode(_parentNode), true);
+            Console.WriteLine("[Proposer] Sending passed decree [{0}:{1}] and NextBallot [{2}:{3}] to learners.", 
+                                                                    SavedSuccess._ballotId, 
+                                                                    MessageHelper.ByteArrayToString(SavedSuccess._decree), 
+                                                                    _parentNode.lastTried, 
+                                                                    MessageHelper.ByteArrayToString(_parentNode.decree));
+
+            BeginBallot beginBallot = new BeginBallot(_parentNode.Client._messageIdCounter, _parentNode.Id, _parentNode.lastTried, _parentNode.decree);
+
+            SuccessBeginBallot successBeginBallot = new SuccessBeginBallot(SavedSuccess, beginBallot);
+
+            //Delete savedsuccess
+            SavedSuccess = null;
+            
+            await _parentNode.Client.SendMessageToCluster(successBeginBallot, _parentNode.quorum.GetClusterExcludingNode(_parentNode), true);
 
             //send this message to own acceptor
-            await _parentNode.Acceptor.OnReceiveSuccessBeginBallot(successBeginBallotMsg);
+            await _parentNode.Acceptor.OnReceiveBeginBallot(beginBallot);
 
             while (_parentNode.voters.Count() < _parentNode.quorum.Count())
             {
                 //wait for every quorum member to reply
                 if ((DateTime.Now - TimeAtPreviousAction).TotalMilliseconds >= Node.MINUTE_IN_PAXOS_TIME * 22)
                 {
-                    return 1;
+                    return -1;
                 }
             }
-            return 0;
+            return 1;
         }
         else
         {
             Console.WriteLine("[Proposer] Cannot send beginballot message, because not polling.");
         }
-        return 1;
+        return -1;
     }
-
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <returns>returns '1' if the whole quorum has voted,
+    ///  '-1' if timeout</returns>
     private async Task<int> SendBeginBallotMessage()
     {
         if (_parentNode.status == NodeStatus.polling && _parentNode.isPresident)
@@ -531,16 +463,16 @@ public class Proposer
                 //wait for every quorum member to reply
                 if ((DateTime.Now - TimeAtPreviousAction).TotalMilliseconds >= Node.MINUTE_IN_PAXOS_TIME * 22)
                 {
-                    return 1;
+                    return -1;
                 }
             }
-            return 0;
+            return 1;
         }
         else
         {
             Console.WriteLine("[Proposer] Cannot send beginballot message, because not polling.");
         }
-        return 1;
+        return -1;
     }
 
     public void ReceiveVotedMessage(Voted voted)
@@ -565,7 +497,9 @@ public class Proposer
     ///   Checks if the decree has been voted for by the quorum.
     ///   If so, it writes it to the ledger and sends a success message to all other peers
     /// </summary>
-    private async Task<int> Succeed()
+    /// <param name="SaveSuccess">Set SaveSuccess true to save the message to SavedSuccess, used in CompressedPaxos</param>
+    /// <returns></returns>
+    private async Task<int> Succeed(bool SaveSuccess = false)
     {
         TimeAtPreviousAction = DateTime.Now;
         bool quorumMembersAreVoters =
@@ -589,14 +523,19 @@ public class Proposer
                                             _parentNode.decree,
                                             _parentNode.entryId);
 
-
-
+            //In Compressed paxos, when sending to db, the StartPolling will not find the decree in 
             await _parentNode.Learner.WriteSingleDecreeToLedgerImmediately(success);
 
             _parentNode.status = NodeStatus.idle;
 
             //check if compressedPaxos is on
-            if (!_parentNode.CompressedPaxos)
+            if (_parentNode.CompressedPaxos && SaveSuccess)
+            {
+                SavedSuccess = success;
+                Thread.Sleep(1);
+            }
+            //otherwise send a Success message to network
+            else
             {
                 await SendSuccessMessage(success);
             }
@@ -707,17 +646,8 @@ public class Proposer
                             && _parentNode.status == NodeStatus.idle
                             && GetOnlineNodes().HasMajorityOf(_parentNode.AllNodes))
                         {
-
-                            if (Proposals.Count() == 1)
-                            {
-                                byte[] toBallot = Proposals.Dequeue();
-                                await ExecutePaxos(toBallot, false, true, 0);
-                            }
-                            else
-                            { //use compressed paxos if proposal count is higher than 1
-                                byte[] toBallot = Proposals.Dequeue();
-                                await ExecutePaxosLoop(toBallot, false, true, 0);
-                            }
+                            Proposals.TryDequeue(out var toBallot);
+                            await ExecutePaxos(toBallot, false, true, 0);
                         }
                     }
                 });
@@ -786,6 +716,7 @@ public class Proposer
 
     public void OnDecreeProposal(DecreeProposal decreeProposal)
     {
+        Console.WriteLine("Received a new decree proposal for [{0}] from [{1}]", MessageHelper.ByteArrayToString(decreeProposal._decree), decreeProposal._senderId);
         Proposals.Enqueue(decreeProposal._decree);
     }
 

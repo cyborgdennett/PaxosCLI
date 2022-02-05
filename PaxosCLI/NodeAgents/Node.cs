@@ -28,7 +28,7 @@ public class Node
 {
     private bool canExecute = true;
     private static string NODES_FILE_PATH = "Nodes/nodes.csv";
-    public bool CompressedPaxos { get; set; }
+    public bool CompressedPaxos { get; set; } = true; //Set to false if you don't need SuccessBeginBallot-msg optimization
     public string NetworkName { get; private set; } = "";
     public int Id { get; private set; }
     public IPAddress IPAddress { get; private set; }

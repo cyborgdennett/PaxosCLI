@@ -21,7 +21,6 @@ public class Program
         string[] arg = { };
         if (args.Length != 0)
         {
-
             Console.WriteLine(args[0]);
             arg = args[0].Split(";");
         }
@@ -43,8 +42,6 @@ public class Program
                         t.Node.ManualInput(input[0], input[1]);
                 }
                 catch (Exception ex) { }
-
-
             }
         }
 
@@ -53,10 +50,13 @@ public class Program
         p.startup();
         p.addNodeFile("testnetwork", new List<(int, int)> { (1, 10000) });
         p.addNodeFile("testnetwork", new List<(int, int)> { (2, 10001) });
-        p.addNodeFile("HomeNetwork-0123", new List<(int, int)> { (1, 10002) });
-        p.addNodeFile("HomeNetwork-0123", new List<(int, int)> { (2, 10003) });
+        p.addNodeFile("HomeNetwork-0123", new List<(int, int)> { (3, 10002) });
+        p.addNodeFile("HomeNetwork-0123", new List<(int, int)> { (4, 10003) });
+        //p.addNodeFile("testnetwork", new List<(int, int)> { (1, 10000) }, IPAddress.Parse("145.137.127.72"));
+        //p.addNodeFile("testnetwork", new List<(int, int)> { (2, 10001) }, IPAddress.Parse("145.137.127.72"));
+        //p.addNodeFile("HomeNetwork-0123", new List<(int, int)> { (1, 10002) }, IPAddress.Parse("145.137.127.72"));
+        //p.addNodeFile("HomeNetwork-0123", new List<(int, int)> { (2, 10003) }, IPAddress.Parse("145.137.127.72"));
 
-        
         var testNodeList = new List<(int, string)>() { (10000, "testnetwork"),
                                                     (10001, "testnetwork"),
                                                     (10002, "HomeNetwork-0123"),
@@ -71,7 +71,6 @@ public class Program
             Console.WriteLine("Cleaning");
             process.ForEach(p => p.CloseMainWindow());
             process.ForEach(p => p.Close());
-            process.ForEach(p => p.Kill());
             Console.WriteLine("Closing");
         };
 
@@ -150,11 +149,9 @@ public class Program
             Console.WriteLine("An error occurred. Cleaning");
             process.ForEach(p => p.CloseMainWindow());
             process.ForEach(p => p.Close());
-            process.ForEach(p => p.Kill());
             Console.WriteLine("Closing");
         }
     }
-    public Program() { }
     public void startup()
     {
         try
@@ -217,8 +214,8 @@ public class Program
         string networkName { get; set; }
         public void start()
         {
-            Thread = new Thread(async () =>
-            {
+            //Thread = new Thread(() =>
+            //{
                 try
                 {
                     Node = new Node(networkName, port);
@@ -227,8 +224,8 @@ public class Program
                 {
                     Console.WriteLine(e.ToString());
                 }
-            });
-            Thread.Start();
+            //});
+            //Thread.Start();
         }
         public TestNode(int port = 10000, string network = "")
         {

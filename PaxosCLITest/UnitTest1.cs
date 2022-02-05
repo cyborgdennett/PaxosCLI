@@ -16,7 +16,7 @@ namespace PaxosCLITest
         [TestMethod]
         public void TestMethod2()
         {
-            Assert.IsTrue(true);
+
         }
         [TestMethod]
         public void TestMultiScreen()
@@ -42,5 +42,6 @@ namespace PaxosCLITest
             //sr.Close();
             Assert.IsTrue(true);
         }
+
     }
 }
