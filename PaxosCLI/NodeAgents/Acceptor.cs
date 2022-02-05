@@ -94,7 +94,7 @@ public class Acceptor
 
     public async Task OnReceiveSuccessBeginBallot(SuccessBeginBallot successBeginBallotMsg)
     {
-        Console.WriteLine("[Acceptor] Received Success-Beginballot from {1}",
+        Console.WriteLine("[Acceptor] Received Success-Beginballot from [{0}]",
                            successBeginBallotMsg._senderId);
 
         await _parentNode.Learner.ReceiveSuccess((Success)successBeginBallotMsg.successMsg);

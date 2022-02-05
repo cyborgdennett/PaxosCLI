@@ -10,11 +10,10 @@ namespace PaxosCLI.NodeAgents;
 public class NetworkTransaction
 {
     public Node _parentNode { private set; get; }
-    private ConcurrentDictionary<String, Node> NetworkLeaderNodes;
-    private SemaphoreSlim _messagesAvailable = new SemaphoreSlim(0);
-    private ConcurrentDictionary<int, bool> FoundTransactionIds;
-    private ConcurrentQueue<(string network, byte[] decree, bool saveToLedger)> TransactionProposals;
-    private ConcurrentQueue<(string network, int transId, byte[] decree, Node node)> TransactionQueue;
+    private Dictionary<String, Node> NetworkLeaderNodes;
+    private Dictionary<int, bool> FoundTransactionIds;
+    private Queue<(string network, byte[] decree, bool saveToLedger)> TransactionProposals;
+    private Queue<(string network, int transId, byte[] decree, Node node)> TransactionQueue;
     private HashSet<string> KnownNetworks;
     public bool SaveTransactionToLedger { private set; get; }//set to True to allow saving to ledger before sending to other network
     private Thread? TransactionHandlerThread;
@@ -33,7 +32,7 @@ public class NetworkTransaction
 
         //fill list of networks
         GetNetworkNames();
-
+        //start a thread for receiving transaction messages and handling them.
         InitNetworkTransaction();
         InitReceiveNetworkTransaction();
     }
@@ -63,7 +62,7 @@ public class NetworkTransaction
                     DateTime t = DateTime.Now;
                     while (_parentNode.prevDec != transaction.decree && (DateTime.Now - t).TotalSeconds < 1 )
                     {
-                        Thread.Sleep(10);
+                        Thread.Sleep(1);
                     }
                     TransactionSuccess msg = new(_parentNode.Client._messageIdCounter, _parentNode.Id, _parentNode.NetworkName, transaction.transId);
                     await _parentNode.Client.SendMessageToNode(msg, transaction.node, false, false);
@@ -143,19 +142,18 @@ public class NetworkTransaction
     private async Task ExecuteCrossNetwork(string network, byte[] decree)
     {
         //Get Cluster from given network
-        var TransactionNodes = GetCluster(network);
+        var TransactionNodes = GetNetworkCluster(network);
         if (TransactionNodes == null) return;
 
         //delete possible previous instance of leader
         NetworkLeaderNodes.TryGetValue(network, out var value);
-        NetworkLeaderNodes.TryRemove(new(network, value));
+        NetworkLeaderNodes.Remove(network);
 
         //make "Find Leader"-message and send to the cluster
         FindLeader findLeaderMsg = new(_parentNode.Client._messageIdCounter, _parentNode.Id, network);
-
+        Console.WriteLine("[Transaction] Sending FindLeader-message to network: [{0}] of size [{1}]", network, TransactionNodes.Count);
         foreach ((int i, Node node) in TransactionNodes)
         {
-            Console.WriteLine("[Transaction] Sending to: {0}, from {1}", node.PortNumber, _parentNode.PortNumber);
             await _parentNode.Client.SendMessageToNode(findLeaderMsg, node, false, false);
         }
 
@@ -186,6 +184,7 @@ public class NetworkTransaction
 
         //send transaction message to leader
         Transaction transactionMsg = new(_parentNode.Client._messageIdCounter, _parentNode.Id, network, transactionId, decree);
+        Console.WriteLine("[Transaction] Sending Transaction-message to: [{0}] with [ID={1}, decree={2}]", network, transactionId, MessageHelper.ByteArrayToString(decree));
         await _parentNode.Client.SendMessageToNode(transactionMsg, NetworkLeaderNodes[network], false, false);
 
         t = DateTime.Now;
@@ -204,11 +203,6 @@ public class NetworkTransaction
             Console.WriteLine("[Transaction] Error: TransactionSuccess timeout");
             return;
         }
-        else
-        {
-            Console.WriteLine("[Transaction] Received Transaction Success [{0}]", transactionId);
-        }
-
     }
 
     //Helper function
@@ -225,7 +219,7 @@ public class NetworkTransaction
 
         files.ForEach(file => KnownNetworks.Add(file.Name.Split(".")[0]));
     }
-    private static Cluster? GetCluster(string network)
+    private static Cluster? GetNetworkCluster(string network)
     {
         var endpoints = GetEndpoints(network);
         if (endpoints == null)
@@ -236,7 +230,6 @@ public class NetworkTransaction
 
         foreach (string endpoint in endpoints.Skip(1))
         {
-            //Console.WriteLine(endpoint);
             string[] endpointPropterties = endpoint.Split(',');
             int e_id = Int32.Parse(endpointPropterties[0]);
             System.Net.IPAddress e_ip = System.Net.IPAddress.Parse(endpointPropterties[1]);
@@ -295,7 +288,6 @@ public class NetworkTransaction
     }
     public async Task OnLeader(Leader leader)
     {
-        Console.WriteLine(leader._ip);
         System.Net.IPEndPoint ipe;
         try
         {
@@ -311,8 +303,8 @@ public class NetworkTransaction
 
     public async Task OnTransactionSuccess(TransactionSuccess message)
     {
-        if(FoundTransactionIds.TryAdd(message._transactionId, true))
-            Console.WriteLine("[Transaction] Received TransactionSuccess message with id[{0}]", message._transactionId);
+        FoundTransactionIds.TryAdd(message._transactionId, true);
+            
     }
 
     public async Task OnTransaction(Transaction transaction, Node node)

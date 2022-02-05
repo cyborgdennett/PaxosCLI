@@ -88,8 +88,6 @@ public class Server
                     _parentNode.Proposer.ReceiveLastVoteMessage(lastVote);
                     break;
                 case "SuccessBeginBallot":
-                    //TODO: not finished!!!
-                    Console.WriteLine("Received SuccessBeginBallot message");
                     SuccessBeginBallot successBeginBallotMsg = (SuccessBeginBallot)receivedMessage;
                     await _parentNode.Acceptor.OnReceiveSuccessBeginBallot(successBeginBallotMsg);
                     break;
@@ -111,7 +109,6 @@ public class Server
                     break;
                 case "DecreeProposal":
                     DecreeProposal decreeProposal = (DecreeProposal)receivedMessage;
-                    Console.WriteLine("Received a new decree proposal for [{0}]", MessageHelper.ByteArrayToString(decreeProposal._decree));
                     _parentNode.Proposer.OnDecreeProposal(decreeProposal);
                     break;
                 case "RequestMissingEntriesMessage":
@@ -172,7 +169,7 @@ public class Server
                     await _parentNode.NetworkTransaction.OnTransactionSuccess(transactionSuccess);
                     break;
                 default:
-                    Console.WriteLine("Unknown request received.");
+                    Console.WriteLine("Unknown request received." + MessageHelper.ByteArrayToString(request));
                     break;
             }
         }
